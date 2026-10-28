@@ -4,6 +4,8 @@ extends SceneTree
 ##   godot --headless --path . -s res://tests/op_test.gd -- --weeks=2 --seed=1001 [--type=hostage] [--v]
 ##     [--decide=clear|suspend|fire|retrain|lapse] [--hire] [--no-events] [--press]
 ## v0.9: the city's politics run too; --weeks=40 holds the election and prints the ending.
+## P0.B3: --json=path also writes every week's snapshot, every operation and the run's
+## totals as JSON (tools/campaign_report.py turns it into the playtest table).
 
 const Campaign = preload("res://scripts/campaign/campaign.gd")
 const Autoplan = preload("res://scripts/campaign/autoplan.gd")
@@ -15,6 +17,7 @@ const Maps = preload("res://scripts/maps/registry.gd")
 const Nav = preload("res://scripts/sim/nav.gd")
 const World = preload("res://scripts/sim/world.gd")
 const Recorder = preload("res://scripts/sim/recorder.gd")
+const Rogue = preload("res://scripts/campaign/rogue.gd")
 
 
 func _init() -> void:
@@ -35,6 +38,11 @@ func _init() -> void:
 	var tot_findings := 0
 	var tot_deficit := 0
 	var hung := 0   # P0.A1: operations that hit the step guard without ending
+	var j_weeks: Array = []   # P0.B3: --json
+	var problems_json := ""
+	var j_ops: Array = []
+	var j_ally_lines: Array = []   # LOST / Won back from operations, before the week's snapshot
+	var t_wall := Time.get_ticks_msec()
 	for wk in weeks:
 		if c.over():
 			break
@@ -68,6 +76,7 @@ func _init() -> void:
 				# the game will not run a plan with nobody in it: the situation goes unattended
 				s["plan"] = {}
 				print("%s %-9s map %02d vis %d  nobody free to send" % [s["id"], s["type"], int(s["map"]), int(s["visibility"])])
+				j_ops.append({"id": s["id"], "type": s["type"], "map": int(s["map"]), "vis": int(s["visibility"]), "ran": false})
 				continue
 			var b: Dictionary = Operation.build_planned(s, plan, c.dept, lv, nav)
 			var w = World.new()
@@ -88,11 +97,22 @@ func _init() -> void:
 			tot_findings += int(res.get("findings", 0))
 			var lines: Array = c.dept.apply_result(w, lv.map_name)
 			lines.append_array(c.after_operation(s["id"], res, w))
+			# P0.B3: an ally lost to an operation's aftermath used to be invisible in this log
+			for ln in lines:
+				if _ally_line(ln):
+					print("  week: ", ln)
+					j_ally_lines.append(String(ln))
 			c.record(s["id"], res)
 			var smy: Dictionary = w.incident.summary()
 			tot_off_k += int(smy["officers_killed"])
 			tot_off_d += int(smy["officers_down"])
 			tot_ops += 1
+			j_ops.append({"id": s["id"], "type": s["type"], "map": int(s["map"]), "vis": int(s["visibility"]), "ran": true,
+				"label": String(res.get("label", "")), "score": int(res.get("score", 0)), "sim_s": snappedf(w.t, 0.1),
+				"officers": int(smy["officers"]), "officers_killed": int(smy["officers_killed"]), "officers_down": int(smy["officers_down"]),
+				"suspects_killed": int(smy["suspects_killed"]), "civ_hit": int(smy.get("civ_hit", 0)), "civ_killed": int(smy.get("civ_killed", 0)),
+				"civ_hit_police": int(smy.get("civ_hit_police", 0)), "misjudged": int(smy.get("misjudged", 0)), "findings": int(res.get("findings", 0)),
+				"hung": not w.over})
 			for f in w.incident.findings:
 				if f["kind"] == "officer_killed":
 					tot_causes[("bled out" if String(f["text"]).ends_with("died of wounds") else "killed outright")] = tot_causes.get(("bled out" if String(f["text"]).ends_with("died of wounds") else "killed outright"), 0) + 1
@@ -124,6 +144,19 @@ func _init() -> void:
 			c.dept.open_cases().size(), c.dept.available().size(), p.avg_trust(),
 			" ".join(p.ALLY_ORDER.map(func(a): return "%s%d%s" % [{"council": "CL", "union": "UN", "coalition": "CC", "da": "DA"}[a], p.standing(a), "x" if p.lost(a) else ""])),
 			p.share("kettering"), p.share("okonjo"), p.share("pell"), p.pending.size()])
+		var j_allies := {}
+		for a in p.ALLY_ORDER:
+			j_allies[a] = {"standing": p.standing(a), "lost": p.lost(a)}
+		var j_week := {"week": c.dept.week, "balance": c.dept.balance, "morale": c.dept.morale,
+			"open_cases": c.dept.open_cases().size(), "fit": c.dept.available().size(),
+			"academy": c.dept.officers.filter(func(r): return r["status"] == "academy").size(),
+			"injured": c.dept.officers.filter(func(r): return r["status"] == "injured").size(),
+			"dead_total": c.dept.officers.filter(func(r): return r["status"] == "dead").size(),
+			"trust": snappedf(p.avg_trust(), 0.1), "allies": j_allies,
+			"polls": {"kettering": snappedf(p.share("kettering"), 0.1), "okonjo": snappedf(p.share("okonjo"), 0.1), "pell": snappedf(p.share("pell"), 0.1)},
+			"pending": p.pending.size(), "ops": j_ops, "lines": j_ally_lines}
+		j_ops = []
+		j_ally_lines = []
 		if args.has("ledger"):
 			var cats := {}
 			for le in c.dept.ledger:
@@ -139,9 +172,17 @@ func _init() -> void:
 			for dl in c.run.auto_resolve(c):
 				if args.has("v"):
 					print("    desk: " + String(dl))
+				if _ally_line(dl):   # P0.B3: and so was one lost (or won back) on the desk
+					print("  week: ", dl)
+					j_week["lines"].append(String(dl))
 		for ln in c.end_week():
 			if args.has("v") or String(ln).begins_with("LOST") or String(ln).begins_with("Election"):
 				print("  week: ", ln)
+			if _ally_line(ln) or String(ln).begins_with("Election"):
+				j_week["lines"].append(String(ln))
+			if String(ln).begins_with("Won back") and not args.has("v"):
+				print("  week: ", ln)
+		j_weeks.append(j_week)
 		if c.dept.balance < 0:
 			tot_deficit += 1
 		if args.has("press"):
@@ -175,6 +216,27 @@ func _init() -> void:
 	if args.has("save"):        # 1.1: keep the played campaign (the trailer's election night)
 		c.save()
 		print("saved the campaign to ", Campaign.SAVE_PATH)
+	if args.has("json"):
+		var out := {"version": 1, "seed": int(args.get("seed", "1001")), "rogue": args.has("rogue"),
+			"chief": args.get("chief", "all"), "hire": args.has("hire"), "train": args.has("train"),
+			"decide": args.get("decide", "lapse"), "weeks_asked": weeks, "weeks_played": j_weeks.size(),
+			"engine": Engine.get_version_info()["string"], "wall_ms": Time.get_ticks_msec() - t_wall,
+			"ops": tot_ops, "hung": hung, "officers_killed_per_op": snappedf(float(tot_off_k) / maxf(1, tot_ops), 0.01),
+			"officers_down_per_op": snappedf(float(tot_off_d) / maxf(1, tot_ops), 0.01), "mean_op_score": tot_score / maxi(1, tot_ops),
+			"findings": tot_findings, "deficit_weeks": tot_deficit, "death_causes": tot_causes,
+			"record": c.politics.record.duplicate(), "election": {}, "run_score": {}, "weeks": j_weeks}
+		if c.over():
+			var e2: Dictionary = c.politics.result["ending"]
+			out["election"] = {"winner": e2["winner"], "kept": bool(e2["keep"]), "votes": c.politics.result["votes"], "head": e2["head"]}
+		if c.run != null:
+			out["run_score"] = Rogue.run_score(c)
+		var jf := FileAccess.open(String(args["json"]), FileAccess.WRITE)
+		if jf == null:
+			problems_json = "could not write --json to %s" % args["json"]
+		else:
+			jf.store_string(JSON.stringify(out, "  "))
+			jf.close()
+			print("wrote ", args["json"])
 	# P0.A1: op_test is a diagnostic, but three things are failures, not numbers:
 	# an operation that never ended, a campaign asked for 40 weeks that never held its
 	# election, and a run that played no operation at all.
@@ -185,6 +247,8 @@ func _init() -> void:
 		problems.append("asked for %d weeks, but the campaign never reached the election" % weeks)
 	if weeks > 0 and tot_ops == 0 and only == "":
 		problems.append("no operation ran")
+	if problems_json != "":
+		problems.append(problems_json)
 	print("op_test: %s" % ("ok" if problems.is_empty() else "FAILED: " + "; ".join(problems)))
 	quit(1 if not problems.is_empty() else 0)
 
@@ -258,3 +322,9 @@ func _training_chief(c) -> void:
 			continue
 		if not (r["bad_traits"] as Array).is_empty() and not (r["queue"] as Array).has("coaching"):
 			d.enrol_or_queue(r, "coaching")
+
+
+## P0.B3: a line saying an ally was lost or won back.
+static func _ally_line(ln) -> bool:
+	var t := String(ln)
+	return t.begins_with("LOST:") or t.begins_with("Won back:")

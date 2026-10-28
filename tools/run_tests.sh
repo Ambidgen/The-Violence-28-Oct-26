@@ -107,6 +107,7 @@ save_test.gd|quick|600|exit|
 story_test.gd|quick|300|exit|
 politics_test.gd|quick|600|exit|
 rogue_test.gd|quick|600|exit|
+ui_walk.gd|quick|900|exit|
 determinism_test.gd|full|1800|xfail|-- --verbose
 habits_test.gd|full|1200|exit|-- --strict
 brains_test.gd|full|1200|exit|-- --n=8

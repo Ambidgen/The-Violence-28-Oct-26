@@ -48,6 +48,8 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 
 - **Exit:** one command reproduces this report's campaign table and screenshots.
 
+**Status 2026-10-28: done.** `tools/playtest.sh` (no arguments) reproduces the 28 Oct table and screenshots; `tests/ui_walk.gd` runs headless in the quick tier and rendered under the playtest; `op_test --json` and `tools/campaign_report.py` (which reproduces the 28 Oct numbers from the old logs). Found on the way: op_test never printed an ally lost to an operation or a desk answer (the union was lost in week 10 of seed 1001, not "by week 27"). Evidence: `tests/results/cycle-0B/`.
+
 ### Cycle 0.C — Duplicate procurement charge
 | ID | Task | Files | Size |
 |---|---|---|---|
