@@ -316,8 +316,11 @@ func _desk_card(parent: Control) -> void:
 	for di in run.drafts.size():
 		var d: Dictionary = run.drafts[di]
 		var h := _h(v)
+		# A card the armoury already covers is re-dealt when the inheritance is chosen
+		# (EA_TASKS P0.C2), so the count is read from the draft, not assumed to be three.
+		var ncards: int = (d.get("cards", []) as Array).size()
 		var label: String = {"doctrine": "INHERITANCE  ·  choose what the last chief left you",
-			"procurement": "PROCUREMENT  ·  three contracts, sign one",
+			"procurement": "PROCUREMENT  ·  %d contract%s, sign one" % [ncards, "" if ncards == 1 else "s"],
 			"program": "TRAINING PROGRAM  ·  one habit for the whole force"}.get(d["kind"], "A draft")
 		_text(h, label, INK, 12)
 		var k: int = di
