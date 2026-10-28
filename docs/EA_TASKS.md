@@ -61,6 +61,8 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 - **Debug:** if "same seed deals the same desk" fails, the replacement consumed the main RNG. Move it to its own stream.
 - **Exit:** 0 wasted purchases; reproducibility still passes.
 
+**Status 2026-10-28: done.** The deal-time filter the plan asks for in C1 already existed (`_open_contracts` skipped a contract whose every item was stocked) and could not help: the week-1 procurement draft is dealt in `on_week_start()` **before** the inheritance is chosen, so the stocking that made the card redundant happened afterwards. `contract_stocked()` is now the one predicate, used by the deal, by a new `_revalidate_drafts()` (C2: after a doctrine pick, a signed contract or a free contract from an offer), and by a refusal in `pick()` (C3: a line, no charge, the draft stays open; `from_data()` re-validates restored drafts, so a save written before this change is repaired on load). The replacement draws from its own stream, `draft_rng` (seeded from the run seed, saved as `draft_rng_state`), so the desk's `rng` does not move: same seed, same desk, same later weeks. C4 folds `dup_probe.gd` into `rogue_test`: seeds 1–12 × every inheritance × every contract still offered afterwards must charge exactly the contract's cost and add at least one item; plus the guard, the mid-week free military contract, and an assertion that a re-dealt card advances the replacement stream while the desk's rng stays put. The board's procurement line reads its card count instead of assuming three. Verified: the quick tier (which includes `rogue_test`) is green on **Godot 4.7.2 and 4.4.1** in CI run 40785806997 on PR #1 — any of the new assertions failing would have failed the suite and the job. No engine was available in the sandbox that wrote the change, so the job conclusions, not quoted PASS lines (the CI log blob host is unreachable from it), are the evidence; the static audit (`gd47_check`, 128 files) and `gdparse` on the changed files are clean. Evidence: `tests/results/cycle-0C/`.
+
 ### Cycle 0.D — Version, licence, hygiene
 | ID | Task | Files | Size |
 |---|---|---|---|
@@ -70,6 +72,8 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 | P0.D4 | Set `application/config/use_custom_user_dir` and a fixed user-dir name now, so Steam Cloud paths (P2.C4) never move. Keep `Settings.migrate()` for the old dir. | `project.godot`, `ui/settings.gd` | S |
 
 **Gate 0:** `--quick` and CI green with honest exit codes; the duplicate regression passes; the version line and licence are decided.
+
+**Gate 0 on 2026-10-28:** the duplicate regression passes and `--quick` is green on 4.7.2 and 4.4.1 (cycles 0.A–0.C); **0.D is what is left** — the version line, `LICENSE`/`THIRD_PARTY_NOTICES`, the Remotion decision and the fixed user directory, none of which the code depends on.
 
 ---
 

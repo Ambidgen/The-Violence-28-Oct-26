@@ -2,6 +2,39 @@
 
 Newest first. The README covers the game as it stands; this file keeps the history.
 
+## Unreleased — EA_TASKS cycle 0.C: duplicate procurement charge (2026-10-28)
+
+- **A contract can no longer be signed for kit the armoury already holds** (P0.C1–C3).
+  The 28 Oct playtest reproduced the charge: the week-1 procurement draft is dealt
+  before the inheritance is chosen, so *Plate carriers on day one* plus the plate
+  contract charged **$6,000** and added nothing (`contracts` became
+  `["plates", "plates"]`). Six of twelve seeds dealt it. The deal-time filter that
+  skips a contract whose every item is stocked already existed, but it runs before the
+  stocking that makes the card redundant.
+- **`contract_stocked()`** is the one predicate now: `_open_contracts()` uses it (C1),
+  `pick()` refuses with a line and no charge while leaving the draft open (C3), and
+  `_revalidate_drafts()` uses it.
+- **Drafts are re-validated after every stocking change** (C2): a doctrine pick that
+  stocks the armoury, a signed contract, or a free contract arriving from an offer or
+  event. A redundant card is replaced from the **same tier**; if nothing is left to
+  offer the card is dropped, and a draft with no cards is dropped too. The desk says so
+  in the answer's lines and in the campaign file.
+- **The replacement has its own RNG stream** (`draft_rng`, seeded from the run seed and
+  saved as `draft_rng_state`). The desk's `rng` does not move, so a seed deals the same
+  offers, events and later drafts whether or not a card was re-dealt. A save written
+  before this change restores with the replacement stream restarted from its seed, which
+  only affects which alternative a stale draft receives.
+- **Load repairs old saves**: `from_data()` re-validates the drafts it restores, so a run
+  saved between the inheritance and the contract no longer shows a redundant card.
+- **`rogue_test` covers it** (C4): seeds 1–12 × every inheritance × every contract offered
+  afterwards must produce **0 wasted purchases** and charge exactly the contract's cost;
+  plus the guard, the mid-week free military contract, and an assertion that a re-dealt
+  card consumes only the replacement stream while the desk's rng is untouched. The 28 Oct
+  `dup_probe.gd` is folded in (it lives in `tests/results/playtest-2026-10-28-campaign/`).
+- The board's procurement line reads its card count instead of saying "three contracts",
+  and a card the armoury already covers no longer appears there at all.
+- Evidence: `tests/results/cycle-0C/`.
+
 ## Unreleased — EA_TASKS cycle 0.B: playtest tooling in the tree (2026-10-28)
 
 - **`tools/playtest.sh`: one command for a campaign playtest.** With no arguments it repeats the 28 Oct playtest: three 40-week roguelike runs (seed 1001 `--hire --train`, 2002 minimal, 3003 `--hire`) in parallel, each with its own `user://`, then the rendered walk, then the table. `--weeks=`, `--runs="SEED:opts ..."`, `--no-walk`, `--resolution=WxH`, `--out=`. Writes `campaign-seed<N>.json/.log`, `walk/`, `report.md`, `report.csv`; exits 1 if a run or the walk failed (P0.B).
