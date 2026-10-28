@@ -42,6 +42,8 @@ class RunnerTests(unittest.TestCase):
         env = dict(os.environ, GODOT=str(self.engine), JOBS=str(jobs),
                    TEST_LOG_DIR=str(self.directory / "logs"),
                    TEST_SUITE=suite, TEST_RESULT=result)
+        # these runs are "outside GitHub Actions" even when the tests run in CI
+        env.pop("GITHUB_ACTIONS", None)
         return subprocess.run([str(RUNNER), tier], cwd=ROOT, env=env,
                               text=True, capture_output=True, timeout=30)
 

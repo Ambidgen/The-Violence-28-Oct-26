@@ -353,6 +353,7 @@ So at **trauma ≥ 13.4** (≈ 11.7 at morale 30) an officer can never be calm. 
 |---|---|---|---|---|
 | B1 | 0.A full tier | **Wolf brain backwards:** a lone fighter in an unseen fight spends 0.19 of it hidden with the wolf brain on vs 0.28 off (gate wants more). | `scripts/sim/brain.gd` (wolf), `tests/brains_test.gd --only=wolf --n=24 --v` | fix in Phase 1 (sim changes are rebaselined together in P1.I1) |
 | B2 | 0.A full tier | **Shield lets more through:** rounds reaching an officer facing 3 rifles at 10 m: 1.02 with the shield vs 0.69 without (gate wants fewer). | `world.gd` shield block / `_notice_shield_stop`, `equip_test.gd` shield case | Phase 1 |
+| B4 | first GitHub CI run | **Intermittent quick-tier failure on Godot 4.4.1:** the first CI run (16a76a2) failed one quick-tier suite on 4.4.1 after 7½ minutes; the next run (acace9d) and a local 4.4.1 run passed 17/17. The suite is unknown (the job log could not be read from the sandbox). Failed suites are now reported as annotations, so the next occurrence names itself. | CI annotations on the commit; `gh api repos/.../check-runs/<job>/annotations` | Phase 0 follow-up: if it recurs, fix or quarantine it |
 | B3 | 0.A full tier | **Beanbag slows the arrest:** 224 s to cuff a non-compliant unarmed man with beanbags vs 208 s without (gate wants less). | less-lethal-first order, `equip_test.gd` beanbag case | Phase 1 |
 
 ## Order and overlap
