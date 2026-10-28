@@ -51,7 +51,7 @@ What to protect while fixing: the briefing/debrief clarity, the ward-map board, 
 | Not a tech demo | **Green** | 12 maps, 8 doctrines, 16 contracts, 20 events, 14 offers, politics, IA, press. |
 | Content that survives replays | **Amber** | Run layer exists; untested for dominance (no balance harness yet). |
 | Gameplay trailer + clean screenshots | **Amber** | `tools/make_ads.py` and in-engine screenshot hooks exist; nothing cut yet; some screens currently show a stale map. |
-| Stable and honest build | **Red** | 22 of 35 determinism cases changed (identical count on Web and native Linux, so the fixture is stale, not platform noise); unsigned exe never run on Windows; version still 1.2.1; no `LICENSE`/third-party notices; Remotion licence unresolved; CI exists but is inactive. |
+| Stable and honest build | **Amber** (as of cycle 0.D, 2026-10-28) | The harnesses exit honestly and CI is active on 4.7.2 and 4.4.1; the version line is **1.3.0 Early Access**; `LICENSE` and `THIRD_PARTY_NOTICES` exist and ship in every export; Remotion is settled under its free licence; the user directory is fixed. Still red inside this row: 22 of 35 determinism cases changed (the fixture is stale, not platform noise) and the unsigned exe has never run on Windows. |
 | Steam integration | **Red** | No Steamworks SDK/GodotSteam, achievements, cloud saves, rich presence, Steam Input; settings offer fullscreen only (no resolution, UI scale, rebinding, language). |
 | Legibility on target hardware | **Amber** | Management text is 10–12 px at 1600×900; hover-only reasons for disabled buttons; Steam Deck (1280×800) untested. |
 | Audio/finish | **Amber** | No music; 10 of 14 shorts never play; sfx and ambience present. |

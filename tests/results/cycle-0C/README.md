@@ -23,7 +23,7 @@ asset host is not reachable from it, so the 4.4.1/4.7.2 downloads fail with
 | Check | Result |
 |---|---|
 | `python3 tools/gd47_check.py` | **clean**, 128 GDScript files |
-| `python3 tools/sync_version.py --check` | in sync, 1.2.1 (Windows 1.2.1.0) |
+| `python3 tools/sync_version.py --check` | in sync at the time (1.2.1 / Windows 1.2.1.0; 1.3.0 from cycle 0.D) |
 | `gdparse` (gdtoolkit 4.5.0) on the three changed files | **parses** |
 
 `gdparse` rejects two files this change did not touch — `scripts/ui/ui.gd` and

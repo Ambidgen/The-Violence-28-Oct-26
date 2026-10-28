@@ -83,9 +83,9 @@ Election night prints a run score and records the run in `user://legacy.json`.
 
 ## Saves and version
 
-Campaign and settings data live under Godot's `user://` directory. The campaign save is versioned and older compatible saves are accepted. A corrupt or semantically invalid primary save is checked against the `.bak` copy; when recovery succeeds, the first save preserves the good backup instead of replacing it with the corrupt primary. A save from a newer, unsupported version is not automatically downgraded or overwritten. The title screen warns if a save cannot be loaded and asks for confirmation before starting a new run over it. Keep independent backups, and do not run multiple game instances against the same save slot.
+Campaign and settings data live under Godot's `user://` directory, which is pinned to one fixed folder — `TheViolence`, from `application/config/custom_user_dir_name` — so the path never moves when the project is renamed (and is the path a cloud-save service would use). On launch, `Settings.migrate()` copies saves, settings and the legacy file forward from the folders earlier builds wrote (`The Violence`, and `The Violence - Vertical Slice` before that), never over a file that already exists. The campaign save is versioned and older compatible saves are accepted. A corrupt or semantically invalid primary save is checked against the `.bak` copy; when recovery succeeds, the first save preserves the good backup instead of replacing it with the corrupt primary. A save from a newer, unsupported version is not automatically downgraded or overwritten. The title screen warns if a save cannot be loaded and asks for confirmation before starting a new run over it. Keep independent backups, and do not run multiple game instances against the same save slot.
 
-The canonical runtime version is `scripts/version.gd` (`Version.VALUE`). After changing it, synchronize Godot's metadata with:
+The canonical runtime version is `scripts/version.gd` (`Version.VALUE`, and `Version.CHANNEL` for the title's label). The line is 1.3.x for Early Access and 2.0 for the 1.0 release. After changing it, synchronize Godot's metadata with:
 
 ```sh
 python3 tools/sync_version.py

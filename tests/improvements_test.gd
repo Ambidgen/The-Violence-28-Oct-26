@@ -10,6 +10,7 @@ const Outcome = preload("res://scripts/campaign/outcome.gd")
 const Pacing = preload("res://scripts/sim/pacing.gd")
 const Decals = preload("res://scripts/view/decals.gd")
 const Version = preload("res://scripts/version.gd")
+const Settings = preload("res://scripts/ui/settings.gd")
 
 var failures := 0
 
@@ -28,6 +29,9 @@ func _init() -> void:
 	_test_pools()
 	_test_short_policy()
 	_test_version()
+	_test_version_line()
+	_test_user_dir()
+	_test_notices()
 	print("improvements: ", "ALL OK" if failures == 0 else "%d failures" % failures)
 	quit(0 if failures == 0 else 1)
 
@@ -131,6 +135,46 @@ func _test_short_policy() -> void:
 	c.dept.week = 4
 	check(c.claim_short("s09_case"), "a new short is allowed after cooldown")
 	check(not c.claim_short("s09_case", true), "force cannot bypass per-key repetition limit")
+
+
+## P0.D1: 1.3.x is the Early Access line, and the title and credits say so.
+func _test_version_line() -> void:
+	var v := Version.VALUE.split(".")
+	check(v.size() == 3 and v[0] == "1" and v[1] == "3", "the tree is on the 1.3 Early Access line (%s)" % Version.VALUE)
+	check(Version.CHANNEL == "Early Access", "the version line names its channel (%s)" % Version.CHANNEL)
+	var front := FileAccess.get_file_as_string("res://scripts/ui/front.gd")
+	check(front.contains("Version.CHANNEL") and front.contains("CHANNEL.to_upper()"),
+		"the title corner prints the channel from Version.CHANNEL")
+	for bit in ["THIRD_PARTY_NOTICES", "all rights reserved", "not finished"]:
+		check(front.contains(bit), "the credits mention \"%s\"" % bit)
+
+
+## P0.D4: the saves live in one fixed directory, and older folders are still carried.
+func _test_user_dir() -> void:
+	var project := FileAccess.get_file_as_string("res://project.godot")
+	check(project.contains("config/use_custom_user_dir=true"), "project.godot sets a custom user directory")
+	check(project.contains('config/custom_user_dir_name="%s"' % Settings.USER_DIR),
+		"and its name matches Settings.USER_DIR (%s)" % Settings.USER_DIR)
+	var dirs: Array = Settings.legacy_dirs()
+	check(dirs.size() >= 3 and String(dirs[0]).ends_with(Settings.OLD_DIR), "the original slice folder is still carried across")
+	check(dirs.any(func(d): return String(d).ends_with("/The Violence")), "so is the folder the project name derived")
+	check(dirs.any(func(d): return String(d).ends_with("/" + Settings.USER_DIR)), "and the fixed directory is recognised as current")
+	check(Settings.CARRY.has("legacy.json"), "the legacy file (unlocked doctrines) is carried too")
+
+
+## P0.D2: the licence and the third-party notices exist, and the export ships them.
+func _test_notices() -> void:
+	var lic := FileAccess.get_file_as_string("res://LICENSE")
+	var notices := FileAccess.get_file_as_string("res://THIRD_PARTY_NOTICES")
+	check(lic.length() > 500 and lic.contains("All rights reserved"), "LICENSE states the licence (all rights reserved)")
+	check(lic.contains("THIRD_PARTY_NOTICES"), "LICENSE points at the third-party notices")
+	check(notices.contains("Godot Engine contributors") and notices.contains("SIL OPEN FONT LICENCE"),
+		"THIRD_PARTY_NOTICES carries the engine (MIT) and the font (OFL)")
+	check(notices.contains("Remotion") and notices.contains("free"), "and records the Remotion position (P0.D3)")
+	var presets := FileAccess.get_file_as_string("res://export_presets.cfg")
+	var ships := presets.split("\n").filter(func(l): return l.begins_with("include_filter") and l.contains("LICENSE") and l.contains("THIRD_PARTY_NOTICES"))
+	check(ships.size() == presets.split("\n").filter(func(l): return l.begins_with("include_filter")).size(),
+		"every export preset ships LICENSE and THIRD_PARTY_NOTICES")
 
 
 func _test_version() -> void:

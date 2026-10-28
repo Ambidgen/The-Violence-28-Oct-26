@@ -2,6 +2,48 @@
 
 Newest first. The README covers the game as it stands; this file keeps the history.
 
+## Unreleased — EA_TASKS cycle 0.D: version, licence, hygiene (2026-10-28)
+
+Gate 0 closed. The three things it was waiting on, decided and implemented.
+
+- **The version line is 1.3.x = Early Access, 2.0 = the 1.0 release** (P0.D1). `Version.VALUE`
+  is **1.3.0** and a new `Version.CHANNEL` says "Early Access"; `tools/sync_version.py`
+  wrote 1.3.0 / Windows 1.3.0.0 into `project.godot` and `export_presets.cfg`. The title
+  plate now carries a red **EARLY ACCESS** stamp with `V1.3.0` beside it, drawn from
+  `Version.CHANNEL` rather than a literal, so the label moves with the version. The Windows
+  resource fallback in `tools/patch_rc.py` is gone: a build that cannot read
+  `scripts/version.gd` stops instead of shipping an exe stamped with a stale number.
+- **`LICENSE`: proprietary, all rights reserved** (P0.D2). Reading, forking for review and
+  quoting in reviews, criticism and reporting are allowed; redistribution, commercial use,
+  derivative works and reuse of the art, audio, text or city data are not. Contributions
+  sent as pull requests are licensed to the project.
+- **`THIRD_PARTY_NOTICES`** (P0.D2): the Godot Engine MIT text, the Patrick Hand OFL 1.1
+  pointer and text file, Remotion and its render-time fonts (Courier Prime, Oswald, Open
+  Sans — OFL) and React (MIT), and the Python asset tools (numpy/scipy BSD, Pillow
+  MIT-CMU). Both files are added to `include_filter` in **every** export preset, so a
+  shipped build carries them, and the credits screen now names the channel and the
+  development state, the cutscene tooling, the licence line and the notices.
+- **Remotion: the free licence applies** (P0.D3). It is free for an individual, a team of
+  up to three people, or a non-profit; the project qualifies, so no company licence is
+  required and the openers and shorts are **not** re-rendered (P4.C1 keeps them as they
+  are). The decision and the version (4.0.537) are recorded in the notices, together with
+  the trigger for revisiting it: more than three people on the project, a publisher, or a
+  company formed around it.
+- **The user directory is fixed** (P0.D4): `application/config/use_custom_user_dir=true`
+  with `custom_user_dir_name="TheViolence"`, decided before any cloud-save path exists, so
+  renaming the game can never move a save. `Settings.migrate()` now carries files from
+  both folders earlier builds wrote (`The Violence - Vertical Slice`, then `The Violence`)
+  into the fixed one, never over an existing file, and now carries `legacy.json` too — the
+  unlocked doctrines used to stay behind in the old folder.
+- **The Windows and Linux preset metadata says who made it**: company "Ambidgen",
+  copyright "Copyright (c) 2026 Ambidgen. All rights reserved."
+- **`improvements_test` guards all of it**: the version is on the 1.3 line and `CHANNEL`
+  names it, the title and credits still print the channel, the notices and the licence;
+  `project.godot`'s user-directory key matches `Settings.USER_DIR`; the legacy folders are
+  still listed and `legacy.json` still carried; both licence files exist and **every**
+  export preset ships them.
+- Evidence: `tests/results/cycle-0D/`.
+
 ## Unreleased — EA_TASKS cycle 0.C: duplicate procurement charge (2026-10-28)
 
 - **A contract can no longer be signed for kit the armoury already holds** (P0.C1–C3).
