@@ -1,0 +1,40 @@
+; Engine configuration file.
+; The Violence - vertical slice (Godot 4.7.2 primary; backwards-compatible to 4.4.1)
+
+config_version=5
+
+[application]
+
+config/name="The Violence"
+config/description="Police command and CQB autobattler: planned operations, a persistent department, an equipment database and doors, twelve tactical maps and a forty-week campaign."
+config/version="1.2.1"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.4", "4.7")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.925, 0.925, 0.925, 1)
+
+[debug]
+
+; Godot 4.7's analyzer is stricter than 4.4's. These keep the untyped/unsafe
+; access warnings visible (1 = warn) so the remaining `var level` / `var world`
+; style members stay on the radar without breaking the build. Set to 2 to make
+; any of them an error, or 0 to silence.
+gdscript/warnings/untyped_declaration=1
+gdscript/warnings/inferred_declaration=1
+gdscript/warnings/unsafe_void_return=1

@@ -1,0 +1,156 @@
+# WHERE THIS FILE LIVES
+#
+# This is the CI definition, kept here because the automation account that pushed
+# this branch is not allowed to create files under .github/workflows/. Activate it
+# with:
+#
+#     mkdir -p .github/workflows && git mv tools/ci/ci.yml .github/workflows/ci.yml
+#
+# (or copy it there in the GitHub UI: Actions > New workflow). Nothing inside it
+# refers to this path, so the move is the whole change.
+#
+# The Violence: the release gate.
+#
+# Until now every suite in tests/ was run by hand from the README, and the
+# changelog's own history ("pending first run", "no Godot binary could run
+# here") is what that costs: a whole feature pass landed unverified. This runs
+# the static audit and the quick gate tier on both engines the project claims
+# to support, and the full tier on main.
+#
+# The engine is downloaded from the official godotengine/godot release, which
+# is reachable from GitHub-hosted runners. Nothing else is installed: the game
+# has no package dependencies, and the harnesses are plain GDScript run with
+# `-s`.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "Test tier to run"
+        type: choice
+        default: quick
+        options: [check, quick, full]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: static audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # No engine needed: bracket balance, duplicate members, tab-only
+      # indentation, the `:=` constructs 4.7 rejects, and stray class-scope
+      # statements. Catches the class of fault that made v1.2.1 unparseable.
+      - name: gd47_check
+        run: python3 tools/gd47_check.py
+      - name: version metadata is in sync
+        run: |
+          python3 tools/sync_version.py --check || {
+            echo "::error::scripts/version.gd, project.godot and export_presets.cfg disagree. Run python3 tools/sync_version.py and commit all three."
+            exit 1
+          }
+
+  headless:
+    name: headless (${{ matrix.engine }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - engine: "4.7.2-stable"
+            tier: quick
+          # The engine the shipped Windows exe is built on. Kept in the matrix
+          # so a 4.7-only construct cannot reach a release.
+          - engine: "4.4.1-stable"
+            tier: quick
+    env:
+      GODOT_VERSION: ${{ matrix.engine }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: cache the engine
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ matrix.engine }}
+
+      - name: install Godot ${{ matrix.engine }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot
+          url="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          curl -fsSL -o /tmp/godot.zip "$url"
+          unzip -q -o /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v${GODOT_VERSION}_linux.x86_64 ~/godot/godot || true
+          chmod +x ~/godot/godot
+
+      - name: engine version
+        run: ~/godot/godot --version
+
+      - name: import the project
+        # The first headless run builds .godot/ (the import cache); doing it
+        # explicitly keeps its output out of the test logs.
+        run: ~/godot/godot --headless --path . --import || true
+
+      - name: headless suites
+        env:
+          GODOT: ~/godot/godot
+        run: tools/run_tests.sh --${{ github.event.inputs.tier || matrix.tier }}
+
+      - name: upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.engine }}
+          path: build/test-logs/
+          if-no-files-found: ignore
+
+  full:
+    # The simulation and campaign suites, on main and on demand only: they run
+    # dozens of seeded fights each and are the slow half of the suite.
+    name: full tier
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cache the engine
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-4.7.2-stable
+      - name: install Godot 4.7.2-stable
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q -o /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v4.7.2-stable_linux.x86_64 ~/godot/godot
+          chmod +x ~/godot/godot
+      - name: import the project
+        run: ~/godot/godot --headless --path . --import || true
+      - name: full suites
+        env:
+          GODOT: ~/godot/godot
+        run: tools/run_tests.sh --full
+      - name: upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-full
+          path: build/test-logs/
+          if-no-files-found: ignore

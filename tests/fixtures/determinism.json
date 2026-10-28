@@ -1,0 +1,250 @@
+{
+  "cases": {
+    "m00_2v2_sof_untrained_assault_1001": {
+      "digest": "111560cac672a632",
+      "hits": 3,
+      "shots": 3,
+      "t": 40.6,
+      "winner": 0
+    },
+    "m00_2v2_sof_untrained_assault_2002": {
+      "digest": "1640e2fd5f638236",
+      "hits": 2,
+      "shots": 2,
+      "t": 40.4,
+      "winner": 0
+    },
+    "m00_2v2_sof_untrained_assault_3003": {
+      "digest": "608f75ca80dcc0b5",
+      "hits": 2,
+      "shots": 2,
+      "t": 40.57,
+      "winner": 0
+    },
+    "m00_3v5_police_militia_assault_1001": {
+      "digest": "c154d73ff63c90e1",
+      "hits": 11,
+      "shots": 21,
+      "t": 47.1,
+      "winner": 0
+    },
+    "m00_3v5_police_militia_assault_2002": {
+      "digest": "99ec824e0952e92c",
+      "hits": 8,
+      "shots": 12,
+      "t": 53.1,
+      "winner": 0
+    },
+    "m00_3v5_police_militia_assault_3003": {
+      "digest": "3e1892b837e0234d",
+      "hits": 11,
+      "shots": 31,
+      "t": 42.9,
+      "winner": 0
+    },
+    "m00_5v5_regular_regular_assault_1001": {
+      "digest": "808697c29f1e3023",
+      "hits": 14,
+      "shots": 40,
+      "t": 69.7,
+      "winner": 1
+    },
+    "m00_5v5_regular_regular_assault_2002": {
+      "digest": "c0b1ddd4927a9876",
+      "hits": 11,
+      "shots": 58,
+      "t": 59.73,
+      "winner": 0
+    },
+    "m00_5v5_regular_regular_assault_3003": {
+      "digest": "bb9ccb96f10d9b18",
+      "hits": 6,
+      "shots": 28,
+      "t": 54.8,
+      "winner": 0
+    },
+    "m01_2v2_sof_militia_assault_1001": {
+      "digest": "1bc7ec009dce2484",
+      "hits": 3,
+      "shots": 3,
+      "t": 4.4,
+      "winner": 0
+    },
+    "m01_2v2_sof_militia_assault_2002": {
+      "digest": "1dc3cb8e547b0c34",
+      "hits": 3,
+      "shots": 3,
+      "t": 3.17,
+      "winner": 0
+    },
+    "m01_2v2_sof_militia_assault_3003": {
+      "digest": "d894300f7e222c01",
+      "hits": 2,
+      "shots": 2,
+      "t": 2.83,
+      "winner": 0
+    },
+    "m01_4v4_regular_untrained_assault_1001": {
+      "digest": "0a9448b0021bac85",
+      "hits": 9,
+      "shots": 17,
+      "t": 8.77,
+      "winner": 0
+    },
+    "m01_4v4_regular_untrained_assault_2002": {
+      "digest": "31f4ae5820c489ee",
+      "hits": 12,
+      "shots": 48,
+      "t": 18.67,
+      "winner": 0
+    },
+    "m01_4v4_regular_untrained_assault_3003": {
+      "digest": "e0d0f114bbf9c2d9",
+      "hits": 7,
+      "shots": 18,
+      "t": 10.43,
+      "winner": 0
+    },
+    "m04_5v5_police_regular_assault_1001": {
+      "digest": "2def73af40637073",
+      "hits": 14,
+      "shots": 44,
+      "t": 70.03,
+      "winner": 0
+    },
+    "m04_5v5_police_regular_assault_2002": {
+      "digest": "cd1a40d464898ffd",
+      "hits": 11,
+      "shots": 30,
+      "t": 85.73,
+      "winner": 0
+    },
+    "m04_5v5_police_regular_assault_3003": {
+      "digest": "bb8a622fe10e2191",
+      "hits": 12,
+      "shots": 27,
+      "t": 68.1,
+      "winner": 1
+    },
+    "m04_8v8_regular_militia_hunt_1001": {
+      "digest": "54652f8e78945d33",
+      "hits": 12,
+      "shots": 20,
+      "t": 17.2,
+      "winner": 0
+    },
+    "m04_8v8_regular_militia_hunt_2002": {
+      "digest": "e2e45d803be06650",
+      "hits": 15,
+      "shots": 47,
+      "t": 22.43,
+      "winner": 0
+    },
+    "m04_8v8_regular_militia_hunt_3003": {
+      "digest": "8c0ce87e8bf4e908",
+      "hits": 17,
+      "shots": 54,
+      "t": 21.47,
+      "winner": 0
+    },
+    "m07_12v12_sof_regular_assault_1001": {
+      "digest": "32c1212a49550064",
+      "hits": 22,
+      "shots": 176,
+      "t": 62.23,
+      "winner": 0
+    },
+    "m07_12v12_sof_regular_assault_2002": {
+      "digest": "8bdc09f8d6931002",
+      "hits": 29,
+      "shots": 230,
+      "t": 129.67,
+      "winner": 0
+    },
+    "m07_12v12_sof_regular_assault_3003": {
+      "digest": "e10ad2149a6a0564",
+      "hits": 22,
+      "shots": 184,
+      "t": 64.17,
+      "winner": 0
+    },
+    "m10_6v6_police_militia_assault_1001": {
+      "digest": "b5dbf9df53caaf6d",
+      "hits": 11,
+      "shots": 14,
+      "t": 72.03,
+      "winner": 0
+    },
+    "m10_6v6_police_militia_assault_2002": {
+      "digest": "11fe28c6d014e250",
+      "hits": 9,
+      "shots": 10,
+      "t": 23.8,
+      "winner": 0
+    },
+    "m10_6v6_police_militia_assault_3003": {
+      "digest": "3aa4150a6ab32ec5",
+      "hits": 8,
+      "shots": 10,
+      "t": 66.97,
+      "winner": 0
+    },
+    "op1001_W1-1_barricade_m03": {
+      "digest": "3c12e8195e7bad4a",
+      "hits": 5,
+      "shots": 11,
+      "t": 170.0,
+      "winner": 0
+    },
+    "op1001_W1-2_warrant_m06": {
+      "digest": "771423ada2e84cb7",
+      "hits": 1,
+      "shots": 1,
+      "t": 1.0,
+      "winner": 0
+    },
+    "op1001_W1-3_warrant_m05": {
+      "digest": "b01972299f7c0145",
+      "hits": 0,
+      "shots": 0,
+      "t": 33.3,
+      "winner": 0
+    },
+    "op1001_W1-4_event_m11": {
+      "digest": "5b64b65493e1372d",
+      "hits": 0,
+      "shots": 0,
+      "t": 900.03,
+      "winner": 0
+    },
+    "op2002_W1-1_gang_m08": {
+      "digest": "2f215634950b590a",
+      "hits": 14,
+      "shots": 35,
+      "t": 85.23,
+      "winner": 0
+    },
+    "op2002_W1-2_warrant_m05": {
+      "digest": "66a6eee489bcfc89",
+      "hits": 3,
+      "shots": 9,
+      "t": 54.3,
+      "winner": 0
+    },
+    "op2002_W1-3_warrant_m06": {
+      "digest": "ab0312d30c11279b",
+      "hits": 1,
+      "shots": 2,
+      "t": 88.7,
+      "winner": 0
+    },
+    "op2002_W1-4_event_m11": {
+      "digest": "70939829af77bfa4",
+      "hits": 0,
+      "shots": 0,
+      "t": 900.03,
+      "winner": 0
+    }
+  },
+  "version": "1.2.1"
+}
