@@ -248,6 +248,17 @@ run_one() {
 	if [ "$status" = "FAIL" ]; then
 		grep -nE '\bFAILED\b|\bFAIL\b|HUNG|failures?: *[1-9]|problems?: *[1-9]|stalls: *[1-9]|missing: \[.|SCRIPT ERROR|Parse Error|^ERROR:' "$log" | head -5 | sed 's/^/          /'
 	fi
+	# Under GitHub Actions a failed suite also becomes an annotation: it shows on the
+	# commit and the pull request, and the API returns it even where the raw job log
+	# cannot be fetched.
+	if [ "${GITHUB_ACTIONS:-}" = "true" ] && { [ "$status" = "FAIL" ] || [ "$status" = "TIMEOUT" ] || [ "$status" = "XPASS" ]; }; then
+		local detail
+		detail=$(grep -E '\bFAILED\b|\bFAIL\b|HUNG|failures?: *[1-9]|problems?: *[1-9]|stalls: *[1-9]|missing: \[.|SCRIPT ERROR|Parse Error|^ERROR:' "$log" | head -8)
+		[ -z "$detail" ] && detail=$(tail -n 8 "$log")
+		[ "$status" = "TIMEOUT" ] && detail="timed out after ${seconds}s"$'\n'"$(tail -n 5 "$log")"
+		detail="${detail//'%'/'%25'}"; detail="${detail//$'\r'/}"; detail="${detail//$'\n'/'%0A'}"
+		printf '::error title=%s %s (exit %s)::%s\n' "${name%.gd}" "$status" "$rc" "$detail"
+	fi
 }
 
 export -f run_one known_reason known_signature 2>/dev/null || true

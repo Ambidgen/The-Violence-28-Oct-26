@@ -133,6 +133,18 @@ class RunnerTests(unittest.TestCase):
                 self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
                 self.assertIn("determinism_test.gd (xpass)", proc.stdout)
 
+    def test_failed_suite_becomes_a_github_annotation(self):
+        env = dict(os.environ, GODOT=str(self.engine), JOBS="1", GITHUB_ACTIONS="true",
+                   TEST_LOG_DIR=str(self.directory / "logs"),
+                   TEST_SUITE="city_integration_test.gd", TEST_RESULT="script_error")
+        proc = subprocess.run([str(RUNNER), "--quick"], cwd=ROOT, env=env,
+                              text=True, capture_output=True, timeout=30)
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+        self.assertRegex(proc.stdout, r"(?m)^::error title=city_integration_test FAIL \(exit 0\)::.*SCRIPT ERROR")
+        # and not outside GitHub Actions
+        proc = self.run_tier(1, "script_error")
+        self.assertNotIn("::error", proc.stdout)
+
     def test_tilde_in_godot_path_is_expanded(self):
         env = dict(os.environ, HOME=str(self.directory), GODOT="~/godot", JOBS="1",
                    TEST_LOG_DIR=str(self.directory / "logs"),
