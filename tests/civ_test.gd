@@ -117,8 +117,11 @@ func _init() -> void:
 		print("  %-7s won %d/%d  civilians hit %d (by police %d) killed %d  misjudged %d  excessive %d  gave up %d  cuffed %d  officers down %d  suspects down %d  rounds through walls %d  findings %d (video %d)  friendly hits %d  timeouts %d" % [
 			ech, tt["won"], tt["ops"], tt["civ_hit"], tt["civ_hit_police"], tt["civ_killed"], tt["misjudged"], tt["excessive"],
 			tt["surrendered"], tt["arrested"], tt["officers_down"], tt["suspects_down"], tt["walls"], tt["findings"], tt["video"], tt["ff"], tt["timeouts"]])
+	var gate_failed := false
 	if echs.size() == 2:
 		var a: int = totals["patrol"]["civ_hit_police"]
 		var b: int = totals["police"]["civ_hit_police"]
-		print("GATE civilians hit by police: patrol %d vs police tactical %d -> %s" % [a, b, "PASS" if b < a else "FAIL"])
-	quit()
+		gate_failed = not (b < a)
+		print("GATE civilians hit by police: patrol %d vs police tactical %d -> %s" % [a, b, "FAIL" if gate_failed else "PASS"])
+	# P0.A1: the exit code is the gate (one echelon alone, via --only, has no gate)
+	quit(1 if gate_failed else 0)

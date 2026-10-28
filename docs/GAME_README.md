@@ -106,7 +106,7 @@ tools/run_tests.sh --soak      # + the asserted balance matrix (long)
 GODOT=/path/to/godot tools/run_tests.sh --full
 ```
 
-The runner exits nonzero for a failure, script or engine error, or timeout and writes `build/test-logs/<suite>.log`. Use `JOBS=2` to run in parallel or `TIMEOUT_SCALE=2` to allow more time under load; both values must be positive integers. `tools/ci/ci.yml` is a proposed CI configuration, **not active CI**. Run the suites individually when debugging, otherwise prefer the runner. Its own Python regression tests run with `python3 -m unittest discover -s tests -p test_runner.py -v`.
+The runner exits nonzero for a failure, script or engine error, or timeout and writes `build/test-logs/<suite>.log`. Use `JOBS=2` to run in parallel or `TIMEOUT_SCALE=2` to allow more time under load; both values must be positive integers (`TIMEOUT_SCALE` defaults to 2 on two cores or fewer). Every harness sets its own exit code; `determinism_test` is a known failure (`KNOWN`) until its fixture is rebaselined. CI lives in `.github/workflows/ci.yml`. Run the suites individually when debugging, otherwise prefer the runner. Its own Python regression tests run with `python3 -m unittest discover -s tests -p test_runner.py -v`.
 
 Run from the repository root with a Godot executable on your PATH (or substitute its absolute path):
 

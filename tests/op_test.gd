@@ -34,6 +34,7 @@ func _init() -> void:
 	var tot_score := 0
 	var tot_findings := 0
 	var tot_deficit := 0
+	var hung := 0   # P0.A1: operations that hit the step guard without ending
 	for wk in weeks:
 		if c.over():
 			break
@@ -78,6 +79,9 @@ func _init() -> void:
 				w.step()
 				w.events.clear()
 				guard += 1
+			if not w.over:
+				hung += 1
+				print("HUNG: %s %s map %02d did not end in %d steps (%.0f s sim)" % [s["id"], s["type"], int(s["map"]), guard, w.t])
 			runs_left -= 1
 			var res: Dictionary = Outcome.evaluate(s, w)
 			tot_score += int(res.get("score", 0))
@@ -171,7 +175,18 @@ func _init() -> void:
 	if args.has("save"):        # 1.1: keep the played campaign (the trailer's election night)
 		c.save()
 		print("saved the campaign to ", Campaign.SAVE_PATH)
-	quit()
+	# P0.A1: op_test is a diagnostic, but three things are failures, not numbers:
+	# an operation that never ended, a campaign asked for 40 weeks that never held its
+	# election, and a run that played no operation at all.
+	var problems: Array = []
+	if hung > 0:
+		problems.append("%d operation(s) hung" % hung)
+	if weeks >= c.WEEKS and not c.over():
+		problems.append("asked for %d weeks, but the campaign never reached the election" % weeks)
+	if weeks > 0 and tot_ops == 0 and only == "":
+		problems.append("no operation ran")
+	print("op_test: %s" % ("ok" if problems.is_empty() else "FAILED: " + "; ".join(problems)))
+	quit(1 if not problems.is_empty() else 0)
 
 
 ## The intel-reading chief (playtest pass Q4): the suggestion, edited from what

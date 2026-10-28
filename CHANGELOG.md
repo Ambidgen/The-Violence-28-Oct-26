@@ -2,6 +2,16 @@
 
 Newest first. The README covers the game as it stands; this file keeps the history.
 
+## Unreleased — EA_TASKS cycle 0.A: harnesses that fail honestly (2026-10-28)
+
+- **Every harness sets an exit code** (P0.A1). Gates exit 1 on a failed gate: `civ_test` (patrol vs tactical), `equip_test` (any item), `maps_test`/`nav_door_test` (any problem). Diagnostics exit 1 on a broken invariant: `op_test` (an operation that hits the step guard, a 40-week run that never holds its election, or no operation at all), `stall_test` (any stalled match), `fuzz_test` (a bad habit never exercised). `lethality`, `hold`, `sim`, `perf`, `duel_probe`, `trace` and `playtest` exit 1 only if they measured nothing.
+- **Runner** (`tools/run_tests.sh`): trusts exit codes and no longer scans logs for the word FAIL; the engine-error scan now covers every suite, including the former "note" probes that could never fail. `TIMEOUT_SCALE` defaults to 2 on two cores or fewer (P0.A2); `orders_test` gets 900 s. New `xfail` mark: `determinism_test` reports `KNOWN` with its reason (fixture predates the 1.3 simulation changes, 22 of 35 cases differ) and an unexpected pass reports `XPASS` and fails the tier (P0.A4). A leading `~` in `GODOT` is expanded.
+- **CI activated** (P0.A3): `tools/ci/ci.yml` moved to `.github/workflows/ci.yml`. It passed `GODOT=~/godot/godot`, which the runner never expanded, so every headless job would have stopped at "no Godot binary"; it now passes `$HOME`. The static job also runs the runner's own tests.
+- `tests/test_runner.py`: six new cases (exit code over log text, former note suites failing on exit code and on script errors, xfail, xpass serial and parallel, `~` expansion); all six fail against the previous runner.
+- **A known failure must fail the known way.** `KNOWN` now requires the suite's signature in the log (for `determinism_test`, `FAIL: N case(s) changed`) and no engine error; a crash, a missing fixture or a script error in that suite is an ordinary `FAIL`. New runner test `test_xfail_crash_is_not_the_known_failure` (fails, 4 subtests, with the signature check removed).
+- `perf.gd` and `trace.gd` now dispose their `World`. Undisposed, they ended with `ERROR: 9 resources still in use at exit`; harmless while they were "note" suites, but the engine-error scan now covers every suite and would have failed both on every soak run.
+- **Playtest of the cycle:** every one of the 14 changed harnesses was run as-is and with its check deliberately broken (`tests/results/cycle-0A/mutation.log`): all 14 exit 1 when broken. Quick tier on Godot 4.7.2: 16/16 pass.
+
 ## Unreleased (1.3 candidate) — story mode as a roguelike; Endless Battle removed
 
 **The run layer** (`scripts/campaign/rogue.gd`, plan in `docs/ROGUELIKE_PLAN.md`). Every

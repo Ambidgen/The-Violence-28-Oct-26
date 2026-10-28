@@ -47,7 +47,7 @@ func _init() -> void:
 			for sz in sizes:
 				_match(lv, nav, sz[0], sz[1], ech, 9100 + r)
 	print("problems: %d" % problems)
-	quit()
+	quit(1 if problems > 0 else 0)   # P0.A1
 
 
 func _reach_ok(nav, p: Vector2) -> bool:

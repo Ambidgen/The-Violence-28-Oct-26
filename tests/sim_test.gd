@@ -6,6 +6,8 @@ const Maps = preload("res://scripts/maps/registry.gd")
 const Nav = preload("res://scripts/sim/nav.gd")
 const World = preload("res://scripts/sim/world.gd")
 
+var played := 0   # P0.A1: a batch report; it fails only when it played nothing
+
 func cfg(id: String, team: int, slot: int, ech: String, lv, extra_bad := []) -> Dictionary:
 	var good := {}
 	for g in Habits.preset_good(ech):
@@ -30,6 +32,7 @@ func run(lv, nav, a: String, b: String, n: int, verbose := false, extra_a := [],
 		while not w.over:
 			w.step()
 		wins[w.winner] += 1
+		played += 1
 		dur += w.t
 		if verbose and s == 0:
 			for l in w.log_lines:
@@ -52,18 +55,18 @@ func _init() -> void:
 			n = int(a.trim_prefix("--n="))
 	if "--ablation" in args:
 		_ablation(lv, nav, n)
-		quit()
+		quit(0 if played > 0 else 1)
 		return
 	if "--verbose" in args:
 		run(lv, nav, "sof", "untrained", 1, true)
-		quit()
+		quit(0 if played > 0 else 1)
 		return
 	run(lv, nav, "sof", "untrained", n)
 	run(lv, nav, "untrained", "sof", n)
 	run(lv, nav, "regular", "militia", n)
 	run(lv, nav, "militia", "regular", n)
 	run(lv, nav, "regular", "regular", n)
-	quit()
+	quit(0 if played > 0 else 1)
 
 
 ## The bible's thesis check: identical special-operations reflexes, 40 habits vs none.
@@ -90,5 +93,6 @@ func _ablation(lv, nav, n: int) -> void:
 							o.m_h = 1.0
 					w.step()
 				wins[w.winner] += 1
+				played += 1
 				w.dispose()
 			print("40 habits (A, %s) vs 0 habits (B, %s), speed bonus %s: A %d  B %d  draw %d" % [roles[0], roles[1], "on" if bonus else "OFF", wins[0], wins[1], wins[2]])

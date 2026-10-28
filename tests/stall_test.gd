@@ -62,4 +62,4 @@ func _init() -> void:
 					print("      A-%d mode %s task %s phase %s" % [el["i"] + 1, el["mode"], str(el["task"]), el["phase"]])
 			w.dispose()
 	print("stalls: %d   (%d s)" % [stalls, (Time.get_ticks_msec() - t_all) / 1000])
-	quit()
+	quit(1 if stalls > 0 else 0)   # P0.A1: any stalled match fails the suite

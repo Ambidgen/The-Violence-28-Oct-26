@@ -80,6 +80,7 @@ func _init() -> void:
 		_ablate(args, n, size, maps)
 		quit()
 		return
+	var played := 0   # P0.A1
 	print("attack     hold       layer   A wins   exchange (A lost / B lost)   fallbacks  counters  mean s")
 	for pr in pairs:
 		for layer in ([true] if args.get("layers", "") == "on" else [false, true]):
@@ -120,9 +121,11 @@ func _init() -> void:
 							counters += 1
 					dur += w.t
 					w.dispose()
+			played += games
 			print("%-10s %-10s %-6s %5.0f%%     %6.2f  (%d / %d)            %5d     %5d   %6.1f" % [pr[0], pr[1], "on" if layer else "off",
 				100.0 * a_w / games, float(a_lost) / maxf(1.0, b_lost), a_lost, b_lost, falls, counters, dur / games])
-	quit()
+	# P0.A1: a diagnostic, not a gate: it fails only when it played nothing
+	quit(0 if played > 0 else 1)
 
 
 

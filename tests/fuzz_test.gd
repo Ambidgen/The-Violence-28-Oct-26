@@ -102,4 +102,5 @@ func _init() -> void:
 		if not bad_seen.has(b):
 			missing.append(b)
 	print("bad habits activated: %d/%d  missing: %s" % [bad_seen.size(), Habits.bad_ids().size(), str(missing)])
-	quit()
+	# P0.A1: the summary's claim is the gate: every bad habit must fire somewhere
+	quit(1 if not missing.is_empty() else 0)

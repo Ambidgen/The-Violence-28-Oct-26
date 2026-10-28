@@ -16,31 +16,45 @@
 #   GODOT=/path/to/godot tools/run_tests.sh --quick
 #   JOBS=1              run suites one after another (default; the sim is not
 #                       thread-safe across processes on a small box)
-#   TIMEOUT_SCALE=2     multiply every per-suite timeout
+#   TIMEOUT_SCALE=2     multiply every per-suite timeout (default: 2 on a machine
+#                       with two cores or fewer, 1 otherwise)
 #
 # Exit codes: 0 all green, 1 at least one suite failed, 2 the runner was misused
 # (no Godot binary, unknown flag), 3 a suite timed out.
 #
-# Two things to know about the harnesses this calls:
+# Three things to know about the harnesses this calls:
 #
-#   1. Not all of them set an exit code. Roughly half are diagnostics that print
-#      their numbers and quit(0) whatever happened (civ, equip, hold, lethality,
-#      maps, nav_door, op, ...). For those this runner also scans the
-#      log for FAIL/FAILED/failures>0 and reports the suite as failed, so a
-#      regression cannot pass unnoticed. The right long-term fix is to give each
-#      harness an exit code; this is the safety net until then.
-#   2. determinism_test.gd compares against tests/fixtures/determinism.json. Any
-#      deliberate simulation change makes it fail until the fixture is
-#      regenerated with --write. That is by design; regenerate it in the same
-#      commit as the change and say so in the log.
+#   1. Every harness sets its own exit code (P0.A1, 2026-10-28): gates exit 1 on
+#      a failed gate; diagnostics and probes exit 1 when they broke an invariant
+#      (a hung operation, a campaign that never reached its election) or measured
+#      nothing. The runner trusts that code. It no longer scans logs for the word
+#      FAIL.
+#   2. It still fails a suite whose log shows a GDScript or engine error (SCRIPT
+#      ERROR, Parse Error, ERROR:), because Godot keeps running a script after a
+#      runtime error and can still quit(0). This applies to every suite.
+#   3. A suite marked xfail is a KNOWN failure with a stated reason: it runs and is
+#      reported, but does not fail the tier. If it starts passing it is reported as
+#      XPASS and *does* fail the tier, so the mark cannot outlive the reason. A
+#      failure only counts as KNOWN if the log shows the known signature
+#      (known_signature below) and no engine error; a crash is still a FAIL.
+#      determinism_test.gd is the one xfail today: its fixture predates the 1.3
+#      simulation changes (22 of 35 cases differ on native Linux and on the Web).
+#      Rebaseline it with --write in Phase 1 (EA_TASKS P1.I1), then remove the mark.
 set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 2
 ROOT="$PWD"
 LOGS="${TEST_LOG_DIR:-$ROOT/build/test-logs}"
 GODOT="${GODOT:-godot}"
+# A leading ~ in an environment value is not expanded by the shell (CI used to pass
+# GODOT=~/godot/godot and every headless job stopped at "no Godot binary").
+GODOT="${GODOT/#\~/$HOME}"
 TIER="quick"
-TIMEOUT_SCALE="${TIMEOUT_SCALE:-1}"
+# P0.A2: a small runner gets twice the time, unless the caller says otherwise
+if [ -z "${TIMEOUT_SCALE:-}" ]; then
+	_cores=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+	if [ "$_cores" -le 2 ] 2>/dev/null; then TIMEOUT_SCALE=2; else TIMEOUT_SCALE=1; fi
+fi
 JOBS="${JOBS:-1}"
 
 usage() {
@@ -74,11 +88,10 @@ if [ "$TIER" != "list" ]; then
 fi
 
 # name|tier|timeout seconds|how failures are detected|arguments
-#   exit = trust the exit code only
-#   scan = exit code, and FAIL/FAILED text in the log, and "failures" above 0
-#   note = report only for ordinary exits (probes, profiles, galleries); a timeout still fails
+#   exit  = the harness's exit code (plus the engine-error scan every suite gets)
+#   xfail = a known failure (see note 3 above); the reason is in known_reason() below
 PLAN=$(cat <<'EOF'
-_check.gd|check|300|scan|
+_check.gd|check|300|exit|
 godot472_test.gd|quick|300|exit|
 city_integration_test.gd|quick|300|exit|
 character_assets_test.gd|quick|300|exit|
@@ -89,33 +102,51 @@ test_range_determinism_test.gd|quick|900|exit|
 improvements_test.gd|quick|600|exit|
 ops_ui_test.gd|quick|600|exit|
 dept_test.gd|quick|600|exit|
-orders_test.gd|quick|600|exit|
+orders_test.gd|quick|900|exit|
 save_test.gd|quick|600|exit|
 story_test.gd|quick|300|exit|
 politics_test.gd|quick|600|exit|
 rogue_test.gd|quick|600|exit|
-determinism_test.gd|full|1800|exit|-- --verbose
+determinism_test.gd|full|1800|xfail|-- --verbose
 habits_test.gd|full|1200|exit|-- --strict
 brains_test.gd|full|1200|exit|-- --n=8
-civ_test.gd|full|1800|scan|-- --n=40
-equip_test.gd|full|1800|scan|-- --n=12
-lethality_test.gd|full|1200|scan|-- --n=20
-maps_test.gd|full|600|scan|
-nav_door_test.gd|full|900|scan|
-op_test.gd|full|1800|scan|-- --weeks=40 --chief=sensible
-hold_test.gd|full|1800|note|
-stall_test.gd|full|1800|note|
-fuzz_test.gd|full|1800|note|-- --n=60
+civ_test.gd|full|1800|exit|-- --n=40
+equip_test.gd|full|1800|exit|-- --n=12
+lethality_test.gd|full|1200|exit|-- --n=20
+maps_test.gd|full|600|exit|
+nav_door_test.gd|full|900|exit|
+op_test.gd|full|1800|exit|-- --weeks=40 --chief=sensible
+hold_test.gd|full|1800|exit|
+stall_test.gd|full|1800|exit|
+fuzz_test.gd|full|1800|exit|-- --n=60
 balance_test.gd|soak|1800|exit|-- --gate --n=20
 balance_matrix_test.gd|soak|5400|exit|-- --n=30
 scale_playtest.gd|soak|5400|exit|-- --gate --n=30
-sim_test.gd|soak|1800|note|
-perf.gd|soak|900|note|-- --map=10 --na=20 --nb=20 --t=60
-duel_probe.gd|soak|900|note|
-trace.gd|soak|900|note|
-playtest.gd|soak|1800|note|
+sim_test.gd|soak|1800|exit|
+perf.gd|soak|900|exit|-- --map=10 --na=20 --nb=20 --t=60
+duel_probe.gd|soak|900|exit|
+trace.gd|soak|900|exit|
+playtest.gd|soak|1800|exit|
 EOF
 )
+
+# Why each xfail suite is expected to fail. Remove the line together with the mark.
+known_reason() {
+	case "$1" in
+		determinism_test.gd) echo "fixture predates the 1.3 simulation changes (22/35 differ); rebaseline in P1.I1" ;;
+		*) echo "no reason recorded" ;;
+	esac
+}
+
+# The log line an xfail suite must print for its failure to count as the known one.
+# Any other failure (a crash, a script error, a missing fixture) is an ordinary FAIL,
+# so the mark cannot hide a new fault behind an old one.
+known_signature() {
+	case "$1" in
+		determinism_test.gd) echo '^FAIL: [0-9]+ case\(s\) changed' ;;
+		*) echo '^$NEVER' ;;
+	esac
+}
 
 want() {
 	case "$TIER" in
@@ -189,37 +220,36 @@ run_one() {
 	local took=$(( end - start ))
 
 	local status="PASS"
-	case "$detect" in
-		exit)
-			[ "$rc" -ne 0 ] && status="FAIL"
-			;;
-		scan)
-			if [ "$rc" -ne 0 ]; then status="FAIL";
-			elif grep -qE '\bFAILED\b|\bFAIL\b|failures?: *[1-9]|problems?: *[1-9]' "$log"; then status="FAIL";
-			fi
-			;;
-		note)
-			status="NOTE"
-			;;
-	esac
-	if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then status="TIMEOUT"; fi
+	[ "$rc" -ne 0 ] && status="FAIL"
 	# A harness may quit(0) after a script or engine/resource error.
-	if [ "$detect" != "note" ] && [ "$status" = "PASS" ] && grep -qE 'SCRIPT ERROR|Parse Error|^ERROR:' "$log"; then status="FAIL"; fi
+	if [ "$status" = "PASS" ] && grep -qE 'SCRIPT ERROR|Parse Error|^ERROR:' "$log"; then status="FAIL"; fi
+	if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then status="TIMEOUT"; fi
+	if [ "$detect" = "xfail" ]; then
+		case "$status" in
+			FAIL)
+				# expected only if it failed the known way, and without an engine error
+				if grep -qE "$(known_signature "$name")" "$log" && ! grep -qE 'SCRIPT ERROR|Parse Error|^ERROR:' "$log"; then
+					status="KNOWN"     # reported, does not fail the tier
+				fi ;;
+			PASS) status="XPASS" ;;     # the reason is gone: remove the mark
+		esac
+	fi
 	printf '%s\n' "$status" > "$status_file"
 
 	case "$status" in
 		PASS) pass=$((pass+1)); printf '  %sPASS%s    %-28s %4ss\n' "$C_PASS" "$C_OFF" "${name%.gd}" "$took" ;;
-		NOTE) noted=$((noted+1)); printf '  %sNOTE%s    %-28s %4ss\n' "$C_NOTE" "$C_OFF" "${name%.gd}" "$took" ;;
+		KNOWN) noted=$((noted+1)); printf '  %sKNOWN%s   %-28s %4ss  %s\n' "$C_NOTE" "$C_OFF" "${name%.gd}" "$took" "$(known_reason "$name")" ;;
+		XPASS) fail=$((fail+1)); failed_names+=("$name (xpass)"); printf '  %sXPASS%s   %-28s %4ss  expected to fail and passed: remove its xfail mark\n' "$C_FAIL" "$C_OFF" "${name%.gd}" "$took" ;;
 		FAIL) fail=$((fail+1)); failed_names+=("$name"); printf '  %sFAIL%s    %-28s %4ss  %s\n' "$C_FAIL" "$C_OFF" "${name%.gd}" "$took" "$log" ;;
 		TIMEOUT) timeout_n=$((timeout_n+1)); failed_names+=("$name (timeout)"); printf '  %sTIMEOUT%s %-28s %4ss  %s\n' "$C_FAIL" "$C_OFF" "${name%.gd}" "$took" "$log" ;;
 	esac
 	# keep the interesting part of a failure in front of the reader
 	if [ "$status" = "FAIL" ]; then
-		grep -nE '\bFAILED\b|\bFAIL\b|failures?: *[1-9]|problems?: *[1-9]|SCRIPT ERROR|Parse Error|^ERROR:' "$log" | head -5 | sed 's/^/          /'
+		grep -nE '\bFAILED\b|\bFAIL\b|HUNG|failures?: *[1-9]|problems?: *[1-9]|stalls: *[1-9]|missing: \[.|SCRIPT ERROR|Parse Error|^ERROR:' "$log" | head -5 | sed 's/^/          /'
 	fi
 }
 
-export -f run_one 2>/dev/null || true
+export -f run_one known_reason known_signature 2>/dev/null || true
 export GODOT LOGS TIMEOUT_SCALE C_PASS C_FAIL C_NOTE C_OFF
 
 if [ "$JOBS" -gt 1 ]; then
@@ -237,7 +267,8 @@ if [ "$JOBS" -gt 1 ]; then
 		status=$(cat "$status_file" 2>/dev/null || printf 'FAIL')
 		case "$status" in
 			PASS) pass=$((pass+1)) ;;
-			NOTE) noted=$((noted+1)) ;;
+			KNOWN) noted=$((noted+1)) ;;
+			XPASS) fail=$((fail+1)); failed_names+=("$name (xpass)") ;;
 			TIMEOUT) timeout_n=$((timeout_n+1)); failed_names+=("$name (timeout)") ;;
 			*) fail=$((fail+1)); failed_names+=("$name") ;;
 		esac
@@ -250,7 +281,7 @@ fi
 
 echo
 echo "----------------------------------------------------------------"
-printf 'suites: %d   pass: %d   fail: %d   timeout: %d   note: %d\n' \
+printf 'suites: %d   pass: %d   fail: %d   timeout: %d   known failures: %d\n' \
 	"${#selected[@]}" "$pass" "$fail" "$timeout_n" "$noted"
 if [ "$fail" -ne 0 ] || [ "$timeout_n" -ne 0 ]; then
 	echo "failed: ${failed_names[*]}"

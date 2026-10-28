@@ -1,15 +1,6 @@
-# WHERE THIS FILE LIVES
-#
-# This is the CI definition, kept here because the automation account that pushed
-# this branch is not allowed to create files under .github/workflows/. Activate it
-# with:
-#
-#     mkdir -p .github/workflows && git mv tools/ci/ci.yml .github/workflows/ci.yml
-#
-# (or copy it there in the GitHub UI: Actions > New workflow). Nothing inside it
-# refers to this path, so the move is the whole change.
-#
-# The Violence: the release gate.
+# The Violence: the release gate. Active since 2026-10-28 (EA_TASKS P0.A3); it
+# used to sit in tools/ci/ci.yml because the account that pushed it could not
+# write workflow files.
 #
 # Until now every suite in tests/ was run by hand from the README, and the
 # changelog's own history ("pending first run", "no Godot binary could run
@@ -53,6 +44,9 @@ jobs:
       # statements. Catches the class of fault that made v1.2.1 unparseable.
       - name: gd47_check
         run: python3 tools/gd47_check.py
+      - name: test runner regression tests
+        # tools/run_tests.sh itself: exit codes, xfail/xpass, timeouts, ~ in GODOT
+        run: python3 -m unittest discover -s tests -p test_runner.py -v
       - name: version metadata is in sync
         run: |
           python3 tools/sync_version.py --check || {
@@ -105,9 +99,9 @@ jobs:
         run: ~/godot/godot --headless --path . --import || true
 
       - name: headless suites
-        env:
-          GODOT: ~/godot/godot
-        run: tools/run_tests.sh --${{ github.event.inputs.tier || matrix.tier }}
+        # $HOME, not ~: a ~ inside an env value is not expanded, and the runner
+        # used to stop with "no Godot binary" before running anything.
+        run: GODOT="$HOME/godot/godot" tools/run_tests.sh --${{ github.event.inputs.tier || matrix.tier }}
 
       - name: upload logs
         if: failure()
@@ -144,9 +138,9 @@ jobs:
       - name: import the project
         run: ~/godot/godot --headless --path . --import || true
       - name: full suites
-        env:
-          GODOT: ~/godot/godot
-        run: tools/run_tests.sh --full
+        # $HOME, not ~: a ~ inside an env value is not expanded, and the runner
+        # used to stop with "no Godot binary" before running anything.
+        run: GODOT="$HOME/godot/godot" tools/run_tests.sh --full
       - name: upload logs
         if: failure()
         uses: actions/upload-artifact@v4

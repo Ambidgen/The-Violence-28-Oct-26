@@ -113,6 +113,7 @@ func _init() -> void:
 	elif set_name == "ablate":
 		all = ablation()
 	var pick: Array = []
+	var rows := 0   # P0.A1
 	if sel == "all":
 		pick = range(all.size())
 	else:
@@ -134,10 +135,11 @@ func _init() -> void:
 		var line := "%d,%s,%.1f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.2f,%.1f,%.1f" % [idx, cell[0],
 			r["a"], r["b"], r["d"], r["t"], r["ad"], r["bd"], r["ex"], r["ff"], r["ah"], r["bh"], r["stray"], r["as"], r["bs"]]
 		print(line)
+		rows += 1
 		if f != null:
 			f.store_line(line)
 			f.flush()
-	quit()
+	quit(0 if rows > 0 else 1)   # P0.A1: a matrix; fails only if no cell ran
 
 
 func run_cell(lv, nav, cell: Array, n: int) -> Dictionary:

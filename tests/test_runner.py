@@ -29,6 +29,8 @@ class RunnerTests(unittest.TestCase):
             "      timeout) exit 124 ;;\n"
             "      script_error) echo 'SCRIPT ERROR: simulated failure'; exit 0 ;;\n"
             "      engine_error) echo 'ERROR: failed loading resource'; exit 0 ;;\n"
+            "      fail_text) echo 'GATE something -> FAIL'; exit 0 ;;\n"
+            "      stale_fixture) echo 'FAIL: 22 case(s) changed. If intended, re-run with --write and read the diff.'; exit 1 ;;\n"
             "      abort) runner=$(ps -o ppid= -p \"$PPID\" | tr -d ' '); kill -KILL \"$runner\"; exit 0 ;;\n"
             "    esac ;;\n"
             "esac\n"
@@ -88,6 +90,57 @@ class RunnerTests(unittest.TestCase):
                 proc = self.run_tier(jobs, "timeout")
                 self.assertEqual(proc.returncode, 3, proc.stdout + proc.stderr)
                 self.assertIn("timeout: 1", proc.stdout)
+
+    # P0.A1 (2026-10-28): the runner trusts exit codes, not log text.
+    def test_exit_code_is_trusted_over_log_text(self):
+        # Every harness now sets its own exit code, so a log line containing FAIL
+        # with exit 0 is a passing suite (e.g. a probe printing a measurement).
+        proc = self.run_tier(1, "fail_text", suite="civ_test.gd", tier="--full")
+        self.assertRegex(proc.stdout, r"(?m)^\s*PASS\s+civ_test\s")
+
+    def test_former_note_suites_now_fail_on_exit_code(self):
+        # stall_test used to be "note": it could never fail the tier.
+        proc = self.run_tier(1, "exit", suite="stall_test.gd", tier="--full")
+        self.assertRegex(proc.stdout, r"(?m)^\s*FAIL\s+stall_test\s")
+        self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+
+    def test_former_note_suites_now_fail_on_script_error(self):
+        proc = self.run_tier(1, "script_error", suite="perf.gd", tier="--soak")
+        self.assertRegex(proc.stdout, r"(?m)^\s*FAIL\s+perf\s")
+
+    def test_xfail_is_known_and_does_not_fail_the_tier(self):
+        # tests/determinism_test.gd only, not test_range_determinism_test.gd
+        proc = self.run_tier(1, "stale_fixture", suite="tests/determinism_test.gd", tier="--full")
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertRegex(proc.stdout, r"(?m)^\s*KNOWN\s+determinism_test\s.*rebaseline")
+        self.assertIn("known failures: 1", proc.stdout)
+
+    def test_xfail_crash_is_not_the_known_failure(self):
+        # a failure without the stale-fixture line (a crash, a missing fixture) or
+        # with a script error must fail the tier, serial and parallel
+        for result in ("exit", "script_error"):
+            for jobs in (1, 2):
+                with self.subTest(result=result, jobs=jobs):
+                    proc = self.run_tier(jobs, result, suite="tests/determinism_test.gd", tier="--full")
+                    self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+                    self.assertIn("determinism_test.gd", proc.stdout.split("failed:")[-1])
+
+    def test_xpass_fails_the_tier(self):
+        # every suite passes, including the xfail one: its mark must be removed
+        for jobs in (1, 2):
+            with self.subTest(jobs=jobs):
+                proc = self.run_tier(jobs, "pass", tier="--full")
+                self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+                self.assertIn("determinism_test.gd (xpass)", proc.stdout)
+
+    def test_tilde_in_godot_path_is_expanded(self):
+        env = dict(os.environ, HOME=str(self.directory), GODOT="~/godot", JOBS="1",
+                   TEST_LOG_DIR=str(self.directory / "logs"),
+                   TEST_SUITE="none", TEST_RESULT="pass")
+        proc = subprocess.run([str(RUNNER), "--check"], cwd=ROOT, env=env,
+                              text=True, capture_output=True, timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        self.assertIn("fake-engine", proc.stdout)
 
     def test_stale_status_files_cannot_mask_failed_children(self):
         self.run_tier(2)

@@ -37,6 +37,8 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 - **Playtest:** break one assertion in each harness on purpose. The runner must go red and name it.
 - **Exit:** `--quick` green; every suite in `--full` can fail.
 
+**Status 2026-10-28: done.** Runner self-tests 13/13; all 14 changed harnesses exit 1 when their check is broken; `--quick` 16/16; `--full` 25 pass, 1 KNOWN, 2 FAIL on pre-existing simulation bugs B1–B3 (below). Two additions beyond the plan: a KNOWN failure must show its signature (a crash in an xfail suite is a FAIL), and `perf`/`trace` now dispose their World (the engine-error scan would otherwise fail them every soak run). Also fixed: CI passed `GODOT=~/...`, which never expands, so every headless job would have stopped before running. Evidence: `tests/results/cycle-0A/`.
+
 ### Cycle 0.B — Playtest tooling in the tree
 | ID | Task | Files | Size |
 |---|---|---|---|
@@ -342,6 +344,14 @@ So at **trauma ≥ 13.4** (≈ 11.7 at morale 30) an officer can never be calm. 
 | P5.D7 | Early Access launch, then patch every 2–3 weeks for two months. | late June – July 2027 |
 
 ---
+
+## Bugs found by the cycles
+
+| ID | Found in | Bug | Where to look | Phase |
+|---|---|---|---|---|
+| B1 | 0.A full tier | **Wolf brain backwards:** a lone fighter in an unseen fight spends 0.19 of it hidden with the wolf brain on vs 0.28 off (gate wants more). | `scripts/sim/brain.gd` (wolf), `tests/brains_test.gd --only=wolf --n=24 --v` | fix in Phase 1 (sim changes are rebaselined together in P1.I1) |
+| B2 | 0.A full tier | **Shield lets more through:** rounds reaching an officer facing 3 rifles at 10 m: 1.02 with the shield vs 0.69 without (gate wants fewer). | `world.gd` shield block / `_notice_shield_stop`, `equip_test.gd` shield case | Phase 1 |
+| B3 | 0.A full tier | **Beanbag slows the arrest:** 224 s to cuff a non-compliant unarmed man with beanbags vs 208 s without (gate wants less). | less-lethal-first order, `equip_test.gd` beanbag case | Phase 1 |
 
 ## Order and overlap
 

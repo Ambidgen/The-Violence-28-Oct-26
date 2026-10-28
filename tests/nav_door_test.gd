@@ -40,7 +40,7 @@ func _init() -> void:
 			"ok" if bad == 0 else "PROBLEMS %d" % bad])
 		problems += bad
 	print("problems: %d" % problems)
-	quit()
+	quit(1 if problems > 0 else 0)   # P0.A1
 
 
 ## Every door: a point on the floor of each room it joins, a path between them, and the

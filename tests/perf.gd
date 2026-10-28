@@ -40,4 +40,5 @@ func _init() -> void:
 		if o.alive():
 			alive[o.team] += 1
 	print("  alive %d/%d at %.1f s" % [alive[0], alive[1], w.t])
-	quit()
+	w.dispose()   # P0.A1: an undisposed World leaves 'resources still in use' (an engine ERROR line)
+	quit(0 if ticks > 0 else 1)   # P0.A1: a profile; fails only if nothing ran

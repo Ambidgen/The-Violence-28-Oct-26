@@ -135,4 +135,5 @@ func _init() -> void:
 	print("what they were doing when hit:")
 	for kk in ks.slice(0, 12):
 		print("  %3d  %s" % [why[kk], kk])
-	quit()
+	# P0.A1: a diagnostic, not a gate: it fails only when it measured nothing
+	quit(0 if int(agg["ops"]) == n and n > 0 else 1)

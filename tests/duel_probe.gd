@@ -93,4 +93,4 @@ func _init() -> void:
 		ks2.sort_custom(func(a, b): return shooter_state[tm][a] > shooter_state[tm][b])
 		for kk2 in ks2.slice(0, 8):
 			print("     %3d  %s" % [shooter_state[tm][kk2], kk2])
-	quit()
+	quit(0 if games > 0 else 1)   # P0.A1: a probe; fails only if no game ran

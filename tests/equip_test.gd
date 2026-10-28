@@ -61,7 +61,8 @@ func _init() -> void:
 		if args.has("v"):
 			print("    with: %s\n    without: %s" % [str(wv), str(wo)])
 	print("%d of %d items change the outcome (%d runs each way, %d s)" % [passed, tests.size(), n, (Time.get_ticks_msec() - t0) / 1000])
-	quit()
+	# P0.A1: any item that fails its gate fails the suite
+	quit(0 if passed == tests.size() else 1)
 
 
 ## measure, direction (+1: higher with the item), smallest difference that counts
