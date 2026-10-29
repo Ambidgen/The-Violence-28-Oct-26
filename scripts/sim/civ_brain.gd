@@ -158,6 +158,10 @@ func _unaware(o, t: float) -> void:
 			continue
 		if w.geom.sight_clear(o.pos, o.eye(), x.pos, 1.3):
 			alarm(o, x.pos, "gun")
+			# officers nearby read the crowd: a bystander recoiling from a gun that is not
+			# police brings them to the ready, looking where he looks (EA_TASKS P1.B)
+			if not x.judges:
+				w.crowd_cue(o, x.pos)
 			return
 	_idle_move(o, t)
 

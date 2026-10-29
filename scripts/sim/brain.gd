@@ -2024,6 +2024,8 @@ func _close_threat(o):
 
 
 func _rule1(o, e) -> void:
+	if _relaxed_watch(o, e):
+		return
 	var tm: Dictionary = w.teams[o.team]
 	tm["last_contact"] = w.t
 	o.last_contact_t = w.t
@@ -2517,7 +2519,22 @@ func _far_target(o):
 	return first
 
 
+## A relaxed officer (GREEN: on post at a public event) watches a bystander he has not
+## judged a threat; he does not point his weapon at him (EA_TASKS P1.B). Judgment runs
+## in perception either way. At the ready, or once a person is judged a threat
+## (cleared_to_fire, including by mistake), Rule 1 and the far engagement are unchanged.
+## Before this a crowd at a quiet rally saw a weapon raised at face after face and ran.
+func _relaxed_watch(o, e) -> bool:
+	if o.judges and o.alert == Op.GREEN and (e.civ or e.complying) and not w.cleared_to_fire(o, e):
+		o.dbg = "watching " + e.id
+		o.look_goal = (e.pos - o.pos).angle()
+		return true
+	return false
+
+
 func _engage_far(o, e) -> void:
+	if _relaxed_watch(o, e):
+		return
 	var tm: Dictionary = w.teams[o.team]
 	tm["last_contact"] = w.t
 	o.last_contact_t = w.t
@@ -3736,8 +3753,12 @@ func _begin_objective(tm: Dictionary, el: Dictionary) -> void:
 				for m in el["members"]:
 					m.ticker["arrest_tid"] = ob.get("target", "")
 			_set_mode(tm, el, "assault")
-		"contain", "post":
+		"contain":
 			_set_posts(tm, el, ob.get("posts", []))
+		"post":
+			# a post keeps the team's base alert: at the ready (YELLOW) on a raid, relaxed
+			# (GREEN) on post at a public event (Operation.police_alert, EA_TASKS P1.B)
+			_set_posts(tm, el, ob.get("posts", []), int(tm.get("base_alert", Op.YELLOW)))
 		"patrol":
 			el["patrol"] = ob.get("route", [])
 			_set_mode(tm, el, "hunt")
