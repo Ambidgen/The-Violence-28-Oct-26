@@ -24,7 +24,7 @@ exists and is **report-only**.
 | File | Status |
 |---|---|
 | `README.md` (this file) | written |
-| `pilot/report.md`, `pilot/summary.json` | the latest pilot (CI run 40812061037): 2 seeds × 4 policies × 40 weeks, 8 runs, 2246 s, Godot 4.7.2, **0 broken runs**, 36 band misses. The first pilot (run 40807612351) was the same picture in 2537 s — the numbers below are from it, and the second run reproduced all of them |
+| `pilot/report.md`, `pilot/summary.json` | the **last** pilot run — regenerated on every push to this branch, so the wall clock in it is that run's. 2 seeds × 4 policies × 40 weeks, 8 runs, 2246–2537 s, Godot 4.7.2, **0 broken runs**, 36 band misses. Three pilots so far (runs 40807612351, 40812061037, 40815643257) produced **identical tables**; the numbers below are from those |
 | the smoke | **green** — `rogue_balance_test --smoke` is in the quick tier and passed on 4.7.2 and 4.4.1 in the same runs as `policies_test.gd` (run 40800062910 onward) |
 | `baseline/` (20 seeds × 4 policies) | **not run** — P1.A4, one `Run workflow` away (tier=balance); the job commits it here |
 
