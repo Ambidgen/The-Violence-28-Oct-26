@@ -16,7 +16,10 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    # main is the release gate. arena/* is the working branch: its push run is what
+    # gives the balance job its two-seed pilot (the pull_request run cannot -- see the
+    # job's `if`, which needs a push event to tell a pilot from a pull request).
+    branches: [main, "arena/**"]
   pull_request:
   workflow_dispatch:
     inputs:
