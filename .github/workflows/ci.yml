@@ -112,7 +112,9 @@ jobs:
       - name: headless suites
         # $HOME, not ~: a ~ inside an env value is not expanded, and the runner
         # used to stop with "no Godot binary" before running anything.
-        run: GODOT="$HOME/godot/godot" tools/run_tests.sh --${{ github.event.inputs.tier || matrix.tier }}
+        # a dispatch with tier=balance runs the matrix jobs; these jobs then run their
+        # own tier (the runner has no --balance, and exited 2 before this)
+        run: GODOT="$HOME/godot/godot" tools/run_tests.sh --${{ (github.event.inputs.tier && github.event.inputs.tier != 'balance') && github.event.inputs.tier || matrix.tier }}
 
       - name: upload logs
         if: failure()
