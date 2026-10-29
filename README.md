@@ -12,6 +12,10 @@ This is **1.3.0, Early Access** — a work in progress, labelled as such on the 
 
 See [the game guide](docs/GAME_README.md) for controls, saves, campaign systems and individual test commands. The project uses Godot's compatibility renderer. Existing binaries must be **rebuilt** to include changes in this checkout; the Windows binary is not tracked in Git.
 
+## Trailer prototypes
+
+Five 20-second creative directions made with five different animation frameworks are available in the [screening room](trailers/index.html). The [trailer guide](trailers/README.md) links the individual MP4s, editable source, credits, and render instructions. These are prototypes and combine labelled game captures, visual-prototype footage, and AI-generated concept art; they are not final gameplay trailers.
+
 ## The city and the game
 
 - [`port-carrick/city.json`](port-carrick/city.json) is the canonical, deterministic model: six wards, 275 streets, 12,666 buildings and 25 authored sites. Its site IDs, addresses, ward, visibility and coordinates now drive new calls; they are displayed on the board and in briefings.
@@ -63,5 +67,6 @@ The city generator and validator have separate Python dependencies and commands;
 - `scripts/campaign/`, `scripts/sim/`, `scripts/ui/`, `scripts/maps/`: campaign, simulation, interface and tactical layouts.
 - `port-carrick/`: official city generator, validator, viewer, data and model specification.
 - `tests/`, `tools/run_tests.sh`: headless regression, determinism and balance harnesses.
+- `trailers/`: five trailer prototypes, screening room, and animation sources (excluded from Godot imports).
 - `docs/GAME_README.md`, `docs/CURRENT_MODEL.md`, `docs/ROGUELIKE_PLAN.md`, `docs/VISUAL_OVERHAUL.md`: game guide and design history.
 - `CHANGELOG.md`, `RELEASE_READINESS.md`, `release/README.md`: historical releases and remaining shipping work.
