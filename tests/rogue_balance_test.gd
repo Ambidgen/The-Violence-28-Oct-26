@@ -218,6 +218,22 @@ func _ops_csv(runs: Array) -> String:
 	return "\n".join(out) + "\n"
 
 
+## Every run's week-end roster and account, one line a week (EA_TASKS P1.C1: injury weeks
+## lost, academy throughput, the fit curve).
+const WEEK_COLS := ["seed", "policy", "week", "fit", "injured", "academy", "dead_total", "balance", "morale"]
+
+
+func _weeks_csv(runs: Array) -> String:
+	var out: PackedStringArray = [",".join(WEEK_COLS)]
+	var sorted_runs := runs.duplicate()
+	sorted_runs.sort_custom(func(a, b): return [int(a["seed"]), String(a["policy"])] < [int(b["seed"]), String(b["policy"])])
+	for r in sorted_runs:
+		for wk in r.get("weeks", []):
+			out.append(",".join([int(r["seed"]), String(r["policy"]), int(wk["week"]), int(wk["fit"]), int(wk["injured"]),
+				int(wk["academy"]), int(wk["dead_total"]), int(wk["balance"]), int(wk["morale"])].map(func(x): return str(x))))
+	return "\n".join(out) + "\n"
+
+
 ## One operation for the roster-bleed measurement (EA_TASKS P1.C1): what it was, where,
 ## how many went, who went down and how (killed by a suspect, by a colleague, or bled out
 ## with nobody named), and how it ended.
@@ -407,6 +423,7 @@ func _finish(runs: Array, broken: Array, policy_list: Array, weeks: int, n_seeds
 		"derived": by_policy,
 	})
 	_write_text("%s/ops.csv" % out_dir, _ops_csv(runs))
+	_write_text("%s/weeks.csv" % out_dir, _weeks_csv(runs))
 	print(report)
 	print("rogue_balance: %d run(s) in %d s, %d broken, %d band miss(es) -> %s" % [
 		runs.size(), int(wall / 1000), broken.size(), misses, out_dir])

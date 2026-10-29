@@ -205,6 +205,7 @@ func show_board(lines := []) -> void:
 		GREY,
 		11
 	)
+	_roster_strip(box, c)
 	_dept_strip(box)
 	if c.run != null:
 		_desk_card(box)
@@ -989,6 +990,27 @@ func _election_night(lines: Array) -> void:
 
 
 ## The money, morale and open cases at a glance (v0.8.5).
+## Next week's roster against this week's calls (EA_TASKS P1.C2), so a shrinking
+## department is seen a week before it costs a call.
+func _roster_strip(parent: Control, c) -> void:
+	var o: Dictionary = c.roster_outlook()
+	var parts: Array = []
+	if int(o["back"]) > 0:
+		parts.append("%d back from injury" % int(o["back"]))
+	if int(o["graduates"]) > 0:
+		parts.append("%d from the academy" % int(o["graduates"]))
+	if int(o["returning"]) > 0:
+		parts.append("%d back from courses or suspension" % int(o["returning"]))
+	if int(o["to_course"]) > 0:
+		parts.append("%d leaving for a queued course" % int(o["to_course"]))
+	var txt := "NEXT WEEK  ·  %d fit%s." % [int(o["fit"]), (" (" + ", ".join(parts) + ")") if not parts.is_empty() else ""]
+	if int(o["open"]) > 0:
+		txt += "  This week's %d open call%s want %d between them." % [int(o["open"]), "" if int(o["open"]) == 1 else "s", int(o["want"])]
+	if bool(o["short"]):
+		txt += "  Below %d fit, calls go unattended: hire, or bring people back." % c.ROSTER_FLOOR
+	_text(parent, txt, Ink.accent(0.9) if bool(o["short"]) else INK, 12)
+
+
 func _dept_strip(parent: Control) -> void:
 	var d = main.campaign.dept
 	var v := _card(parent)
@@ -1051,6 +1073,41 @@ func _status_of(r: Dictionary, busy: Dictionary) -> String:
 	return "fit"
 
 
+## EA_TASKS P1.C4: the standing order. The chief sets how many officers to keep on the
+## books; at the turn of each week the academy takes recruits towards it while the
+## four-week forecast can carry them. Visible here, changed or cancelled here.
+func _standing_order_card(d) -> void:
+	var v := _card(box)
+	var k: int = int(d.keep_on_books)
+	var head := (
+		"STANDING ORDER  ·  keep %d on the books (%d now)" % [k, d.on_books()]
+		if k > 0
+		else "STANDING ORDER  ·  none (%d on the books)" % d.on_books()
+	)
+	_text(v, head, INK, 12)
+	_text(
+		v,
+		"At the turn of each week the academy enrols recruits (two at most) until the books reach the number, while the four-week forecast stays in the black after their academy place and pay. A recruit reports two weeks later.",
+		GREY,
+		10
+	)
+	if k > 0 and d.on_books() < k:
+		var why: String = d.standing_blocked()
+		_text(v, ("Next turn: %s." % why) if why != "" else "Next turn: the academy will take recruits.", Ink.accent(0.9) if why != "" else GREY, 10)
+	var h := _h(v)
+	_btn(h, "-", func(): _set_standing(maxi(0, k - 1) if k > 0 else 0))
+	_btn(h, "+", func(): _set_standing(maxi(k + 1, d.on_books() + 1) if k == 0 else k + 1))
+	if k > 0:
+		_btn(h, "Cancel the order", func(): _set_standing(0))
+
+
+func _set_standing(n: int) -> void:
+	main.campaign.dept.keep_on_books = n
+	flash = ("Standing order: keep %d on the books." % n) if n > 0 else "Standing order cancelled."
+	main.ops_dept_changed()
+	_roster()
+
+
 func _roster() -> void:
 	mode = "roster"
 	_clear()
@@ -1060,6 +1117,7 @@ func _roster() -> void:
 	if flash != "":
 		_text(box, flash, INK, 11)
 		flash = ""
+	_standing_order_card(d)
 	_applicants()
 	_sep()
 	_text(box, "Click an officer to open their file: training, and dismissal.", GREY, 10)
@@ -1339,6 +1397,7 @@ func _applicants() -> void:
 		INK,
 		12
 	)
+	_emergency_card(d)
 	if pool.is_empty():
 		_text(
 			box,
@@ -1410,13 +1469,65 @@ func _applicants() -> void:
 		var hb := _btn(
 			h,
 			(
-				"Hire  ($%s, then $%s a week)"
+				"Hire  ($%s now, payroll +$%s a week)"
 				% [Department.money(Department.applicant_cost(r)), Department.money(Courses.pay(r))]
 			),
 			func(): _hire_applicant(rec)
 		)
 		hb.disabled = d.frozen()
 		hb.tooltip_text = String(UI.officer_file(r))
+
+
+## EA_TASKS P1.C3: an experienced officer from a neighbouring force, on duty this week,
+## at twice a lateral's signing cost -- the lever for a roster that is short now, not in
+## two weeks. One a week; frozen with the rest of hiring when the account is in the red.
+func _emergency_card(d) -> void:
+	var r: Dictionary = d.emergency_candidate()
+	var v := _card(box)
+	_text(v, "EMERGENCY LATERAL  ·  on duty this week", Ink.accent(0.9), 12)
+	_text(
+		v,
+		(
+			"%s %s  ·  %d years with a neighbouring force, %s  ·  judgment %d, temper %d, integrity %d%s"
+			% [
+				r["rank"],
+				r["name"],
+				int(r.get("years", 0)),
+				Habits.EXP_NAMES[int(r["exp"])],
+				int(r["judgment"]),
+				int(r["temper"]),
+				int(r["integrity"]),
+				("  ·  personality: " + String(r["personality"]).to_lower()) if r["personality"] != "" else ""
+			]
+		),
+		GREY,
+		10
+	).tooltip_text = UI.officer_file(r)
+	var h := _h(v)
+	var why: String = d.emergency_blocked()
+	var b := _btn(
+		h,
+		(
+			"Sign  ($%s now, payroll +$%s a week)"
+			% [Department.money(Department.emergency_cost(r)), Department.money(Courses.pay(r))]
+		),
+		func(): _sign_emergency()
+	)
+	b.disabled = why != ""
+	b.tooltip_text = why if why != "" else "Twice a lateral's signing cost; no academy, no wait."
+	if why != "":
+		_text(v, "Not now: %s." % why, GREY, 10)
+
+
+func _sign_emergency() -> void:
+	var got: Dictionary = main.campaign.dept.sign_emergency()
+	flash = (
+		("Signed %s %s as an emergency lateral: on duty this week." % [got["rank"], got["name"]])
+		if not got.is_empty()
+		else "Not now: %s." % main.campaign.dept.emergency_blocked()
+	)
+	main.ops_dept_changed()
+	_roster()
 
 
 func _hire_applicant(r: Dictionary) -> void:

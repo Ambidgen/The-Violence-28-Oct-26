@@ -143,6 +143,9 @@ func _init() -> void:
 	_applicants_and_statements()
 	_training_queue()
 	_money_by_the_book()
+	_next_week_forecast()
+	_emergency_lateral()
+	_standing_order()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(PATH))
 	print("problems: %d" % problems)
 	quit(1 if problems > 0 else 0)
@@ -330,3 +333,117 @@ func _money_by_the_book() -> void:
 	# and the books agree with the forecast's first row when nothing is spent
 	d.next_week()
 	_check(d.balance == bal0 + swing, "an unspent week ends where the forecast said ($%s)" % Department.money(d.balance))
+
+
+## EA_TASKS P1.C2: the board's next-week strip counts who will be fit by the rules
+## next_week() applies. Twelve weeks of a mixed roster (wounds of every length, academy
+## places, courses run and queued, classroom courses from a ward bed, suspensions):
+## the forecast must equal the fit count the week then starts with.
+func _next_week_forecast() -> void:
+	print("  -- next week's fit, forecast against the week (P1.C2)")
+	var d = Department.new()
+	d.found(4242)
+	d.morale = 80   # nobody resigns: that is a roll, not a rule the strip can know
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var wrong := 0
+	var kinds := {}
+	for wk in 12:
+		for r in d.officers:
+			if r["status"] != "active":
+				continue
+			var roll := rng.randf()
+			if roll < 0.12:
+				r["status"] = "injured"
+				r["out_until"] = d.week + rng.randi_range(1, 4)
+				kinds["injured"] = true
+				if rng.randf() < 0.5 and d.enrol(r, "judgment") == "":
+					kinds["ward course"] = true
+			elif roll < 0.18:
+				if d.enrol(r, ["firearms", "stress", "cqb"][rng.randi() % 3]) == "":
+					kinds["course"] = true
+			elif roll < 0.22:
+				r["status"] = "suspended"
+				r["out_until"] = d.week + rng.randi_range(1, 3)
+				kinds["suspended"] = true
+		for r2 in d.officers:
+			if r2["status"] == "training" and rng.randf() < 0.5:
+				d.enrol_or_queue(r2, "stress")
+				kinds["queued"] = true
+		if rng.randf() < 0.5:
+			d.recruit(false)
+			kinds["academy"] = true
+		var f: Dictionary = d.fit_next_week()
+		d.next_week()
+		var got: int = d.available().size()
+		if got != int(f["fit"]):
+			wrong += 1
+			print("    week %d: forecast %d fit (%s), the week started with %d" % [d.week, int(f["fit"]), str(f), got])
+	_check(wrong == 0, "the forecast matched the week in 12 of 12 (statuses seen: %s)" % ", ".join(kinds.keys()))
+
+
+## EA_TASKS P1.C3: the emergency lateral reports the same week at twice a lateral's
+## signing cost, one a week, frozen with hiring -- and offering or signing one changes
+## nothing else the department rolls (its own stream).
+func _emergency_lateral() -> void:
+	print("  -- the emergency lateral (P1.C3)")
+	var a = Department.new()
+	a.found(555)
+	var b = Department.new()
+	b.found(555)
+	var c1: Dictionary = a.emergency_candidate()
+	var c2: Dictionary = a.emergency_candidate()
+	_check(JSON.stringify(c1) == JSON.stringify(c2), "the week's candidate is the same every time it is shown (%s %s)" % [c1["rank"], c1["name"]])
+	var fit0: int = a.available().size()
+	var bal0: int = a.balance
+	var pr0: int = a.payroll()
+	var r: Dictionary = a.sign_emergency()
+	_check(not r.is_empty() and r["status"] == "active" and a.available().size() == fit0 + 1, "signed: on duty this week (%d -> %d fit)" % [fit0, a.available().size()])
+	_check(a.balance == bal0 - Department.emergency_cost(r) and Department.emergency_cost(r) >= 2 * Courses.LATERAL, "charged twice a lateral's signing ($%d)" % (bal0 - a.balance))
+	_check(a.payroll() == pr0 + Courses.pay(r), "and the payroll rises by the pay the button showed ($%d a week)" % Courses.pay(r))
+	_check(a.emergency_blocked() != "" and a.sign_emergency().is_empty(), "one a week: %s" % a.emergency_blocked())
+	_check(str(a.rng.state) == str(b.rng.state) and JSON.stringify(a.applicants_now()) == JSON.stringify(b.applicants_now()), "the department's own stream and this week's pool are untouched")
+	a.next_week()
+	b.next_week()
+	_check(a.emergency_blocked() == "", "next week another may be signed")
+	a.sign_emergency()
+	var a3 = Department.new()
+	a3.from_data(JSON.parse_string(JSON.stringify(a.to_data())))
+	_check(a3.emergency_blocked() != "", "the week's signing survives a save")
+	a.balance = -1
+	_check(a.emergency_blocked().contains("red"), "frozen with hiring when the account is in the red")
+
+
+## EA_TASKS P1.C4: "keep N on the books". Off by default (and then the week is exactly
+## the week it was); on, the academy takes up to two recruits a week towards N while the
+## four-week forecast can carry them, says so when it cannot, and the order is saved.
+func _standing_order() -> void:
+	print("  -- the standing order (P1.C4)")
+	var a = Department.new()
+	a.found(808)
+	var b = Department.new()
+	b.found(808)
+	a.next_week()
+	b.next_week()
+	_check(JSON.stringify(a.to_data()) == JSON.stringify(b.to_data()), "no order: the week is the week it always was")
+	var n0: int = a.on_books()
+	a.keep_on_books = n0 + 3
+	var lines: Array = a.next_week()
+	var enrolled: Array = lines.filter(func(l): return String(l).begins_with("Standing order:"))
+	_check(enrolled.size() == 2 and a.on_books() == n0 + 2, "short by 3: two recruits this turn (the intake), %d -> %d on the books" % [n0, a.on_books()])
+	_check(a.officers.filter(func(r): return r["status"] == "academy").size() == 2, "and they are at the academy, not on duty")
+	lines = a.next_week()
+	_check(a.on_books() == n0 + 3, "the next turn makes up the last one (%d)" % a.on_books())
+	var c = Department.new()
+	c.from_data(JSON.parse_string(JSON.stringify(a.to_data())))
+	_check(int(c.keep_on_books) == n0 + 3, "the order survives a save")
+	a.keep_on_books = a.on_books() + 1
+	a.balance = -a.allocation * 5
+	lines = a.next_week()
+	var refused: Array = lines.filter(func(l): return String(l).contains("no recruit this week"))
+	_check(refused.size() == 1 and a.on_books() == n0 + 3, "when the forecast cannot carry one, nobody is enrolled and the report says why")
+	a.balance = 1000000
+	a.keep_on_books = 0
+	var before: int = a.on_books()
+	a.next_week()
+	_check(a.on_books() == before, "cancelled: nobody else is enrolled")
