@@ -54,7 +54,7 @@ if [ "$DRY" = 0 ]; then
 fi
 
 run ffmpeg -y -framerate "$FPS" -i "$FRAMES/frame_%04d.jpg" \
-  -vf "$FILTER,scale=1280:720:flags=Lanczos,format=yuv420p" -c:v libx264 -crf 23 -movflags +faststart -an "$OUT/$VARIANT.mp4"
+  -vf "$FILTER,scale=w=1280:h=720:flags=Lanczos,format=yuv420p" -c:v libx264 -crf 23 -movflags +faststart -an "$OUT/$VARIANT.mp4"
 run ffmpeg -y -framerate "$FPS" -i "$FRAMES/frame_%04d.jpg" \
-  -vf "$FILTER,scale=1280:720:flags=Lanczos" -c:v libtheora -q:v 6 -an "$OUT/$VARIANT.ogv"
+  -vf "$FILTER,scale=w=1280:h=720:flags=Lanczos" -c:v libtheora -q:v 6 -an "$OUT/$VARIANT.ogv"
 [ "$DRY" = 1 ] || ls -la "$OUT/$VARIANT.mp4" "$OUT/$VARIANT.ogv"
