@@ -24,7 +24,7 @@ exists and is **report-only**.
 | File | Status |
 |---|---|
 | `README.md` (this file) | written |
-| `pilot/report.md`, `pilot/summary.json` | **run 40807612351** — 2 seeds × 4 policies × 40 weeks, 8 runs, 2537 s, Godot 4.7.2, **0 broken runs**, 36 band misses (report-only) |
+| `pilot/report.md`, `pilot/summary.json` | the latest pilot (CI run 40812061037): 2 seeds × 4 policies × 40 weeks, 8 runs, 2246 s, Godot 4.7.2, **0 broken runs**, 36 band misses. The first pilot (run 40807612351) was the same picture in 2537 s — the numbers below are from it, and the second run reproduced all of them |
 | the smoke | **green** — `rogue_balance_test --smoke` is in the quick tier and passed on 4.7.2 and 4.4.1 in the same runs as `policies_test.gd` (run 40800062910 onward) |
 | `baseline/` (20 seeds × 4 policies) | **not run** — P1.A4, one `Run workflow` away (tier=balance); the job commits it here |
 
@@ -54,14 +54,17 @@ measured through the harness at all, and the shape is the playtest's:
 | weeks below $0 | 3 | 0 | 4.5 | **13** |
 | lowest account | −$12,748 | $40,386 | −$19,395 | **−$156,073** |
 | civilians killed | 3.5 | 4 | 3.5 | **20.5** |
-| killed per operation | 0.38 | 0.30 | **0.21** | 0.38 |
+| killed per operation (mean) | 0.33 | 0.25 | **0.18** | 0.33 |
 | allies lost at the end | 3 | 2 | 3.5 | 4 |
 | allies won back | 0 | 0 | 0 | 0 |
 | chief kept | 2/2 | 1/2 | 2/2 | 1/2 |
 
+- **The two pilots produced identical tables** — every metric, to the decimal, on the
+  same seeds. The run layer is deterministic through the harness, which is what makes a
+  later cycle's change measurable at all.
 - **The policies separate**, which is the first thing this had to show: `minimal` never
-  spends and ends with $414k; `military-first` has the best lethality (0.21) and still
-  runs out of money; `accept-all` bankrupts itself (−$302k at the low), kills 20–33
+  spends and ends with $414k; `military-first` has the best lethality (0.18 mean, 0.21 at
+  its worst) and still runs out of money; `accept-all` bankrupts itself (−$302k at the low), kills 20–33
   civilians and is the only policy whose roster reaches zero fit officers.
 - **Fit collapses on every policy** (lowest 0–8 against a roster floor of 10), and the
   weeks-under-12 counters are 7.5–28.5 of 40. That is finding B1/B2 territory, now with
@@ -71,15 +74,17 @@ measured through the harness at all, and the shape is the playtest's:
   under these policies, or nothing in the run loop pushes standing back up. Worth a
   look in 1.B/1.C; it is not a harness bug — the line the harness counts is the line
   `politics.gd` prints.
-- **Lethality is 0.21–0.38 officers killed per operation** against a band of 0.15, on
-  every policy including the careful one. That is the Gate 1 gap in one number.
+- **Lethality is 0.18–0.38 officers killed per operation** (means; 0.21–0.38 at each
+  policy's worst) against a band of 0.15, on every policy including the careful one. That
+  is the Gate 1 gap in one number.
 - **36 of 52 band checks miss, and none of them is enforced.** The bands are the
   playtest's own figures turned into thresholds; the pilot says the playtest's shape is
   the whole 40-week run, not an edge case. P1.I decides whether the thresholds move or
   the game does.
-- **Wall clock: 21 minutes per 40-week run.** Four at a time on a 4-vCPU runner is ~40
-  minutes per two seeds; twenty seeds is ~7 hours, which is why the balance job's timeout
-  is 12 hours and why the weekly schedule runs eight seeds rather than twenty.
+- **Wall clock: 21 minutes per 40-week run** (2246 s and 2537 s for the two pilots' eight
+  runs). Four at a time on a 4-vCPU runner is ~37–42 minutes per two seeds; twenty seeds
+  is ~7 hours, which is why the balance job's timeout is 12 hours and why the weekly
+  schedule runs eight seeds rather than twenty.
 
 ## How to reproduce
 
@@ -92,13 +97,18 @@ GODOT=/path/to/godot tests/rogue_balance_test.gd --seeds=20 --policy=all --weeks
 the baseline and takes hours; in CI it is the `balance` job (dispatch with `tier=balance`,
 weekly on a schedule, and a two-seed pilot on every `arena/*` push).
 
-## What has to be checked when the first report lands
+## What was checked when the first report landed
 
-1. **No broken runs.** Done for the pilot: `broken: []` for all eight runs, and the
-   harness exits 1 when a run is broken, so the green job is itself the check.
-2. **The shape matches the 28 Oct playtest:** fit collapses, deficits persist, allies are
-   lost. If a policy ends comfortably, the policy does not match the game yet.
-3. **The policies are actually different** — doctrine, contracts, allies and score should
-   separate them. Identical rows for all four mean an answer is being ignored.
-4. **The bands' provisional thresholds** against those numbers, as input to P1.I. They are
-   the owner's decision and none are enforced yet.
+1. **No broken runs.** ✓ `broken: []` for all eight runs, both pilots. The harness exits 1
+   when a run is broken, so a green job is itself the check.
+2. **The shape matches the 28 Oct playtest:** ✓ fit collapses, deficits persist, allies are
+   lost. No policy ends comfortably — even `minimal`, which spends nothing, has 5–11 bad
+   weeks on the roster.
+3. **The policies are actually different:** ✓ and in the expected directions — `minimal`
+   signs nothing and banks $414k, `military-first` buys hardware and halves the civilian
+   toll, `accept-all` goes broke and kills twenty. Identical rows would have meant an
+   answer was being ignored.
+4. **The bands' provisional thresholds** against those numbers: **open, for the owner.**
+   36 of 52 checks miss, which says the playtest's shape is the whole run rather than an
+   edge case. P1.I decides whether the thresholds move or the game does; nothing is
+   enforced until then.
