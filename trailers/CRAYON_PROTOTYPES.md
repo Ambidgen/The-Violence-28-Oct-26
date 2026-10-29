@@ -3,7 +3,9 @@
 Three 12-second prototypes of the **election-night crayon cutscene**
 (`scripts/view/proto/cutscene_view.gd` — a crossroads in the rain, riot line,
 crowd, searchlight, captions printed on, final stamp), generated 2026-10-29 by
-`.github/workflows/cutscene-trailers.yml`. They are deliberately *the same
+`.github/workflows/cutscene-trailers.yml` (Run workflow on main, or push to an
+`arena/*` branch touching the trailer pipeline — GitHub gates manual dispatch
+to the default branch). They are deliberately *the same
 scene*: staging, camera move, timing and drawing are identical, so the only
 thing being judged is a slight deviation of hand/grade at encode time
 (`tools/make_cutscene_trailer.sh`):

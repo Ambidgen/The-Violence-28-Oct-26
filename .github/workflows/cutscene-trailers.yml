@@ -1,6 +1,6 @@
 # Crayon cutscene prototype trailers: the same election-night cutscene
 # prototype rendered three times, each with a slight style deviation at
-# encode time (see tools/make_cutscene_trailer.sh). Manual dispatch only —
+# encode time (see tools/make_cutscene_trailer.sh). Review-only —
 # these are review prototypes for a human to judge, not a gate and not the
 # five rejected trailers/ experiments (different scene, crayon style).
 #
@@ -13,6 +13,19 @@
 name: cutscene-trailers
 
 on:
+  # Push trigger (arena branches): GitHub only offers workflow_dispatch for
+  # workflows present on the default branch, so on this branch a push that
+  # touches the trailer pipeline is how a run starts. Once this file lands
+  # on main, Run workflow works as well.
+  push:
+    branches: ["arena/**"]
+    paths:
+      - ".github/workflows/cutscene-trailers.yml"
+      - "tools/make_cutscene_trailer.sh"
+      - "tools/cutscene_capture.sh"
+      - "tests/cutscene_capture.gd"
+      - "scripts/view/proto/cutscene_view.gd"
+      - "scripts/view/crayon.gd"
   workflow_dispatch:
     inputs:
       secs:
