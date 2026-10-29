@@ -348,6 +348,15 @@ func _walk(seed_v: int) -> void:
 	if main.world != null:
 		main.world.dispose()
 		main.world = null
+	# EA_TASKS B4, found by the --verbose annotation (CI 40884831856, 4.4.1): the office
+	# ambience was still playing when the game was freed, and the audio server let go of
+	# its playback (and the .wav) only on its next mix -- after the engine counted what
+	# was still in use, or before it, depending on the audio thread. Stop every player
+	# and give the server a few frames first.
+	for p in main.find_children("*", "AudioStreamPlayer", true, false) + main.find_children("*", "AudioStreamPlayer2D", true, false):
+		p.stop()
+		p.stream = null
+	await frames(5)
 	root.remove_child(main)
 	main.free()
 	# EA_TASKS B4: the game keeps fonts, textures and sounds in static caches, and what a

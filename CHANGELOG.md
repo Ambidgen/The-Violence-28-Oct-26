@@ -32,8 +32,10 @@ they strike 1 and kill none. Measured by the new CI crowd tier; tables in
   ~12 minutes). A balance dispatch can name its results folder (`results=`).
 - **The 1.A baseline has run**: 20 seeds × 4 policies, five shards, 0 broken runs,
   committed to `tests/results/cycle-1A/baseline/` on branch `baseline-1A`.
-- **`ui_walk` runs with `--verbose`** in the runner: the intermittent resource leak at exit
-  (B4) recurred once after the cache release, and the annotation will now name it.
+- **B4 named and fixed**: `ui_walk` runs with `--verbose`, so a resource leaked at exit is
+  named in the annotation; the first recurrence named the office ambience
+  (`amb_office.wav`), still playing when the walk freed the game. The walk now stops
+  every audio player and waits a few frames before freeing.
 
 ## Unreleased — the 1.A baseline can finish; the walk's exit (2026-10-29)
 
