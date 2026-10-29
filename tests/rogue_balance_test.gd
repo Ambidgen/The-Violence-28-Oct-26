@@ -527,7 +527,7 @@ func _report(by_policy: Dictionary, policy_list: Array, weeks: int, seeds: int, 
 	out.append("")
 	var head := "| metric | " + " | ".join(policy_list.map(func(p): return Policies.label(String(p)))) + " |"
 	out.append(head)
-	out.append("|---|" + "---|" * policy_list.size())
+	out.append("|---|" + "---|".repeat(policy_list.size()))
 	for m in METRICS:
 		var key := String(m[0])
 		var cells: Array = []

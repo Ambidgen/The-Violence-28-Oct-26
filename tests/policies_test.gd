@@ -55,7 +55,10 @@ func _init() -> void:
 	for pol2 in Policies.all():
 		var c = Campaign.new()
 		c.start(1001, true, LEGACY)
-		var had_doctrine := c.run.drafts.any(func(d): return String(d["kind"]) == "doctrine")
+		var had_doctrine: bool = false
+		for d in c.run.drafts:
+			if String(d["kind"]) == "doctrine":
+				had_doctrine = true
 		Policies.settle_desk(c, pol2)
 		check(c.run.blocking().is_empty(), "%s: nothing is left blocking the week (%s)" % [pol2, str(c.run.blocking())])
 		check(c.run.doctrine != "", "%s: the inheritance was chosen (had one dealt: %s -> %s)" % [pol2, str(had_doctrine), c.run.doctrine])
