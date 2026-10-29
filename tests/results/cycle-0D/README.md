@@ -52,8 +52,27 @@ from them.
 
 ## Engine run
 
-_Filled in from the CI run on this branch (PR #1). The quick tier includes
-`improvements_test`, so a green job means every check above held on both engines._
+CI run **40791685096** on PR #1 (commit `ac2fda7`), quick tier:
+
+| Job | Result |
+|---|---|
+| static audit (`gd47_check`, runner tests, version check on 1.3.0) | **success** |
+| headless (4.7.2-stable) — quick tier, `improvements_test` included | **success** |
+| headless (4.4.1-stable) — quick tier, `improvements_test` included | **success** |
+
+**The first run of this cycle failed, and the failure is worth keeping.** Run
+40790768232 (commit `7bd51ca`) failed `_check` and `improvements_test` on 4.7.2 with
+
+```
+Parse Error: Cannot find member "filter" in base "PackedStringArray"
+```
+
+because the notice check called `filter()` on the result of `String.split()`. Neither
+`tools/gd47_check.py` nor `gdtoolkit`'s `gdparse` type-checks, so both passed the file;
+the engine refused to load the script. Fixed in `ac2fda7` by wrapping the split in
+`Array(...)`, and the job went green on both engines. The static audit is a linter, not a
+compiler — CI is the only place a type error is caught, which is the argument for keeping
+this tier on every commit.
 
 ## Reproduce
 
