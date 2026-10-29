@@ -113,10 +113,19 @@ func _init() -> void:
 	var poor = Campaign.new()
 	poor.start(1001, true, LEGACY)
 	poor.dept.balance = 250
+	var from: int = poor.dept.ledger.size()
 	Policies.settle_desk(poor, "accept_all")
 	check(poor.run.blocking().is_empty(), "accept-all settles the desk with $250 in the account (%s)" % str(poor.run.blocking()))
-	check((poor.run.contracts as Array).is_empty() and poor.dept.balance == 250,
-		"and buys nothing it cannot pay for (contracts %s, balance $%d)" % [str(poor.run.contracts), int(poor.dept.balance)])
+	# The invariant is not "it buys nothing" -- accept-all signs what the desk offers,
+	# and a card can pay into the account before another is paid out of it. It is that
+	# no purchase takes the account below zero: the desk is settled, not overdrawn.
+	var cash := 250
+	var low := cash
+	for i in range(from, poor.dept.ledger.size()):
+		cash += int(poor.dept.ledger[i]["amount"])
+		low = mini(low, cash)
+	check(cash == poor.dept.balance, "the ledger accounts for every dollar of the settlement ($%d walked, $%d in the account)" % [cash, int(poor.dept.balance)])
+	check(low >= 0, "and it settles the week without an overdraft (lowest $%d; contracts %s)" % [low, str(poor.run.contracts)])
 
 	# ---- the bands file: well formed, every metric known, still report-only
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://tests/balance_bands.json"))
