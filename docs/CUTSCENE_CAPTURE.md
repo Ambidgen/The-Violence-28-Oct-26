@@ -33,6 +33,8 @@ GODOT=/path/to/godot tools/cutscene_capture.sh --which=cutscene --stills=1,4,8,1
 tools/cutscene_capture.sh --dry-run   # print what would run
 ```
 
+**First CI run (2026-10-29, run 40956363686): green end-to-end** — every step succeeded, artifact `cutscene-capture-cutscene-40956363686` (11.4 MB: stills + `capture.json` + `contact-sheet.png`). Note the workflow file pushed without complaint, so the automation token does carry `workflow` scope in this repo after all.
+
 Output lands in `build/cutscene-captures/<name>/` (git-ignored via `build/`). To keep
 a reviewed sheet as permanent evidence, commit it by hand under `tests/results/` —
 the workflow deliberately does not auto-commit captures.
