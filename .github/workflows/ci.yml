@@ -24,10 +24,10 @@ on:
   workflow_dispatch:
     inputs:
       tier:
-        description: "Test tier to run (balance = the Gate 1 matrix, EA_TASKS P1.A)"
+        description: "Test tier to run (balance = the Gate 1 matrix, EA_TASKS P1.A; crowd = the 1.B crowd sweep)"
         type: choice
         default: quick
-        options: [check, quick, full, balance]
+        options: [check, quick, full, balance, crowd]
       seeds:
         description: "Balance matrix: how many seeds (each plays 4 policies, 40 weeks)"
         type: string
@@ -112,9 +112,9 @@ jobs:
       - name: headless suites
         # $HOME, not ~: a ~ inside an env value is not expanded, and the runner
         # used to stop with "no Godot binary" before running anything.
-        # a dispatch with tier=balance runs the matrix jobs; these jobs then run their
-        # own tier (the runner has no --balance, and exited 2 before this)
-        run: GODOT="$HOME/godot/godot" tools/run_tests.sh --${{ (github.event.inputs.tier && github.event.inputs.tier != 'balance') && github.event.inputs.tier || matrix.tier }}
+        # a dispatch with tier=balance or crowd runs those jobs; these jobs then run
+        # their own tier (the runner has no --balance, and exited 2 before this)
+        run: GODOT="$HOME/godot/godot" tools/run_tests.sh --${{ (github.event.inputs.tier && github.event.inputs.tier != 'balance' && github.event.inputs.tier != 'crowd') && github.event.inputs.tier || matrix.tier }}
 
       - name: upload logs
         if: failure()
@@ -294,11 +294,95 @@ jobs:
           git pull --rebase origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 
+  crowd:
+    # The 1.B crowd sweep (EA_TASKS P1.B1): police on post at a public event, quiet and
+    # attacked, at three trauma floors, 60 seeds per condition, as 18 jobs side by side
+    # (a quiet event is 900 simulated seconds; one core takes ~10 minutes for 20).
+    # On demand only: Actions -> ci -> Run workflow, tier=crowd.
+    name: crowd (trauma ${{ matrix.trauma }}, ${{ matrix.kind }}, seeds ${{ matrix.first }}+20)
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'crowd'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        trauma: [0, 14, 20]
+        kind: [quiet, attacked]
+        first: [0, 20, 40]
+    steps:
+      - uses: actions/checkout@v4
+      - name: cache the engine
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-4.7.2-stable
+      - name: install Godot 4.7.2-stable
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q -o /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v4.7.2-stable_linux.x86_64 ~/godot/godot
+          chmod +x ~/godot/godot
+      - name: import the project
+        run: ~/godot/godot --headless --path . --import || true
+      - name: crowd probe
+        run: |
+          set -o pipefail
+          ~/godot/godot --headless --path . -s res://tests/event_probe.gd -- \
+            --trauma=${{ matrix.trauma }} --first=${{ matrix.first }} --n=20 --morale=60 --json \
+            ${{ matrix.kind == 'attacked' && '--attack' || '' }} | tee crowd.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crowd-${{ matrix.trauma }}-${{ matrix.kind }}-${{ matrix.first }}
+          path: crowd.txt
+
+  crowd-report:
+    name: crowd sweep
+    needs: crowd
+    if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'crowd'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: crowd-*
+          path: shards
+      - name: the table
+        run: |
+          set -uo pipefail
+          DEST="tests/results/cycle-1B/ci-${GITHUB_SHA::7}"
+          echo "DEST=$DEST" >> "$GITHUB_ENV"
+          python3 tools/crowd_sweep.py --summarize shards/*/crowd.txt --out="$DEST" | tee table.txt
+          cat table.txt >> "$GITHUB_STEP_SUMMARY"
+          n=$(grep -c '^EVENT ' shards/*/crowd.txt | awk -F: '{s+=$2} END {print s}')
+          echo "events: $n of 360"
+          echo "::notice title=crowd sweep::$n of 360 events; table in $DEST/table.md"
+      - name: keep the table in the repository
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DEST"
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "crowd: $DEST [skip ci]"
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
+
   full:
     # The simulation and campaign suites, on main and on demand only: they run
     # dozens of seeded fights each and are the slow half of the suite.
     name: full tier
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    # not on a balance or crowd dispatch: those are measurements, not the commit gate
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.tier != 'balance' && github.event.inputs.tier != 'crowd')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
