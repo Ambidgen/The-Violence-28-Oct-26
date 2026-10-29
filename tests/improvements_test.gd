@@ -172,9 +172,13 @@ func _test_notices() -> void:
 		"THIRD_PARTY_NOTICES carries the engine (MIT) and the font (OFL)")
 	check(notices.contains("Remotion") and notices.contains("free"), "and records the Remotion position (P0.D3)")
 	var presets := FileAccess.get_file_as_string("res://export_presets.cfg")
-	var ships := presets.split("\n").filter(func(l): return l.begins_with("include_filter") and l.contains("LICENSE") and l.contains("THIRD_PARTY_NOTICES"))
-	check(ships.size() == presets.split("\n").filter(func(l): return l.begins_with("include_filter")).size(),
-		"every export preset ships LICENSE and THIRD_PARTY_NOTICES")
+	# String.split() returns a PackedStringArray, which has no filter(): wrap it (CI
+	# caught exactly this as a parse error on 4.7.2 — the static audit cannot).
+	var lines: Array = Array(presets.split("\n"))
+	var includes: Array = lines.filter(func(l): return String(l).begins_with("include_filter"))
+	var ships: Array = includes.filter(func(l): return String(l).contains("LICENSE") and String(l).contains("THIRD_PARTY_NOTICES"))
+	check(includes.size() >= 2 and ships.size() == includes.size(),
+		"every export preset ships LICENSE and THIRD_PARTY_NOTICES (%d of %d)" % [ships.size(), includes.size()])
 
 
 func _test_version() -> void:
