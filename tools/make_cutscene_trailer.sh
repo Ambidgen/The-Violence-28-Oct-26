@@ -15,7 +15,9 @@
 #   tools/make_cutscene_trailer.sh --variant=warm-paper --frames=DIR --dry-run
 #
 # Writes <out>/<variant>.mp4 (review) and <out>/<variant>.ogv (Godot-ready,
-# Ogg Theora; silent — the prototype view has no sound design yet).
+# Ogg Theora; silent — the prototype view has no sound design yet). Encoded at
+# 1280x720 (the trailers/ spec): full-res crayon hatch noise inflates crf18
+# encodes to >100 MB for 12 s, which helps nobody reviewing a prototype.
 # Needs ffmpeg with libx264 + libtheora (CI installs the distro ffmpeg).
 set -eu
 
@@ -52,7 +54,7 @@ if [ "$DRY" = 0 ]; then
 fi
 
 run ffmpeg -y -framerate "$FPS" -i "$FRAMES/frame_%04d.jpg" \
-  -vf "$FILTER,format=yuv420p" -c:v libx264 -crf 18 -movflags +faststart -an "$OUT/$VARIANT.mp4"
+  -vf "$FILTER,scale=1280:720:flags=Lanczos,format=yuv420p" -c:v libx264 -crf 23 -movflags +faststart -an "$OUT/$VARIANT.mp4"
 run ffmpeg -y -framerate "$FPS" -i "$FRAMES/frame_%04d.jpg" \
-  -vf "$FILTER" -c:v libtheora -q:v 7 -an "$OUT/$VARIANT.ogv"
+  -vf "$FILTER,scale=1280:720:flags=Lanczos" -c:v libtheora -q:v 6 -an "$OUT/$VARIANT.ogv"
 [ "$DRY" = 1 ] || ls -la "$OUT/$VARIANT.mp4" "$OUT/$VARIANT.ogv"

@@ -17,7 +17,9 @@ thing being judged is a slight deviation of hand/grade at encode time
 | 3 | `warm-paper` | warm colour balance, slight saturation up | aged/cream paper stock |
 
 Each CI artifact (`cutscene-trailer-<variant>-<runid>`, 90 days) contains
-`<variant>.mp4` (review), `<variant>.ogv` (Godot-ready Ogg Theora), the
+`<variant>.mp4` (review), `<variant>.ogv` (Godot-ready Ogg Theora) — both
+1280×720 per the `trailers/` spec, as full-res crayon noise inflates encodes
+past 100 MB — the
 labelled contact sheet, the stills, and `capture.json`. **Silent** — the
 prototype has no sound design; do not judge pacing against finished trailers.
 
