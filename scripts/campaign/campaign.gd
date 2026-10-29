@@ -12,6 +12,7 @@ const Situations = preload("res://scripts/campaign/situations.gd")
 const Politics = preload("res://scripts/campaign/politics.gd")
 const Rogue = preload("res://scripts/campaign/rogue.gd")
 const Equipment = preload("res://scripts/data/equipment.gd")
+const Autoplan = preload("res://scripts/campaign/autoplan.gd")
 
 const VERSION := 4        # 2: v0.9, the city's politics; 3: the endless-battle link (removed); 4: the run layer (roguelike)
 const SAVE_PATH := "user://campaign.json"
@@ -124,6 +125,27 @@ func get_sit(sid: String) -> Dictionary:
 
 ## Officer ids already committed this week: planned into a situation, run in one, or
 ## out canvassing.
+## The board's next-week strip (EA_TASKS P1.C2): who will be fit when next week starts,
+## and what this week's open calls want between them (Suggest a plan's force for each).
+## Below ROSTER_FLOOR the strip is red: the 28 Oct playtest and the 1.A baseline both
+## lose calls to an empty roster long before they lose them to anything else.
+const ROSTER_FLOOR := 12
+
+
+func roster_outlook() -> Dictionary:
+	var out: Dictionary = dept.fit_next_week()
+	var want := 0
+	var n_open := 0
+	for s in board:
+		if String(s.get("status", "")) == "open" and not s.get("truce", false):
+			want += Autoplan.want_for(s)
+			n_open += 1
+	out["want"] = want
+	out["open"] = n_open
+	out["short"] = int(out["fit"]) < ROSTER_FLOOR
+	return out
+
+
 func committed(except_sid := "") -> Dictionary:
 	var out := {}
 	for s in board:

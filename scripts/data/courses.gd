@@ -33,6 +33,7 @@ static func overtime(duration_s: float, night: bool, static_duty: bool) -> int:
 const RECRUIT := 3500           # academy place for a rookie (two weeks before they report)
 const RECRUIT_WEEKS := 2
 const LATERAL := 6500           # signing an experienced officer from another force
+const EMERGENCY_LATERAL := 13000  # EA_TASKS P1.C3: the same, this week, outside the pool (2x)
 const SEVERANCE_WEEKS := 2
 const DEATH_BENEFIT := 3000     # line-of-duty death: the funeral (the pension board pays the family; v0.9.1)
 const MEDICAL := 500            # wounded: what workers' compensation does not cover

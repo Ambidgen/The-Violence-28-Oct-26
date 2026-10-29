@@ -2,6 +2,46 @@
 
 Newest first. The README covers the game as it stands; this file keeps the history.
 
+
+## Unreleased — EA_TASKS cycle 1.B: the crowd cliff (2026-10-29)
+
+At a public event, a department with traumatised officers used to shoot its way through
+the crowd: in 60 quiet events at trauma 14, police struck 413 people and killed 358. Now
+they strike 1 and kill none. Measured by the new CI crowd tier; tables in
+`tests/results/cycle-1B/`, the full account in `docs/EA_TASKS.md` §1.B.
+
+- **Calm is measured from the officer's own floor** (P1.B2). Trauma and low morale set a
+  stress floor; above trauma ≈ 13 an officer could never count as calm, so he re-judged
+  every face he had already cleared, and the first mistake started the cascade.
+- **Check fire** (P1.B3): a police round that strikes a bystander stops that team for
+  20 s — every wrong verdict on a bystander is dropped and nobody in the crowd can be
+  newly misjudged while it lasts.
+- **Police at events start relaxed** and **don't raise a weapon at people they have not
+  judged a threat** (found with `tests/crowd_trace.gd`, P1.B4): the crowd used to see
+  guns pointed at face after face, run, and running people get misjudged.
+- **The attack response**: bystanders who see an attacker's gun cue nearby officers; an
+  officer who has judged the attacker a threat keeps him over bystanders running past;
+  and officers on post go to the gunfire instead of holding their posts for the rest of
+  the event while he shoots out of their sight. Attackers are stopped as often as before
+  and hit about as many people (within noise), but a median 3–5 s later — the price of the
+  relaxed posture. The posture is now an owner's decision (P1.B6).
+- **Briefing**: Suggest a plan still prefers officers under trauma 12 for crowd duty, and
+  now says so and why (P1.B5).
+- **Tools**: `event_probe.gd` counts distinct people struck and attacker outcomes
+  (`--attack`, `--json`); `tools/crowd_sweep.py`; the `crowd` dispatch tier (18 jobs,
+  ~12 minutes). A balance dispatch can name its results folder (`results=`).
+- **The 1.A baseline has run**: 20 seeds × 4 policies, five shards, 0 broken runs,
+  committed to `tests/results/cycle-1A/baseline/` on branch `baseline-1A`.
+- **B4 named and fixed**: `ui_walk` runs with `--verbose`, so a resource leaked at exit is
+  named in the annotation; the first recurrence named the office ambience
+  (`amb_office.wav`), still playing when the walk freed the game. The walk now stops
+  every audio player and waits a few frames before freeing.
+
+## Unreleased — the 1.A baseline can finish; the walk's exit (2026-10-29)
+
+- **The 20-seed balance baseline is sharded** (EA_TASKS P1.A4). A GitHub-hosted job stops at 6 hours, and twenty seeds in one job is 7–11 h, so the dispatched baseline would always have been killed. `balance-plan` → `balance` (one job per four seeds) → `balance-merge`. `rogue_balance_test.gd --merge=DIR1,DIR2 --seeds=N --first=1001` combines shard directories into the same `report.md` and `summary.json` a single process writes, and reports any seed × policy no shard produced, and anything a shard's own summary lists, as broken. Verified: merged two one-seed shards = the two-seed report apart from the wall clock; a missing shard exits 1. `actionlint` clean.
+- **`ui_walk` releases the game's static caches before quitting** (EA_TASKS B4): an intermittent `resources still in use at exit` failed the suite once each on two CI runs and never locally. Unproven fix; the annotations will name a recurrence.
+
 ## Unreleased — EA_TASKS cycle 1.A: the balance harness (2026-10-28)
 
 The measurement every later Phase 1 cycle is judged by. Four policies play whole

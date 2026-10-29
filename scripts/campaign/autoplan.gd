@@ -99,8 +99,11 @@ static func share(board: Array, sid: String, free: int) -> int:
 ## cap: the most officers to take (-1: as many as the situation wants).
 ## 1.3 playtest: above this trauma an officer's stress floor tips them into misjudging a
 ## crowd. Measured with tests/event_probe.gd on a quiet rally, two officers on post:
-## trauma 10, no civilian hit in four events; trauma 14, nineteen killed. The suggestion
-## keeps such officers off crowd duty while anyone else is free.
+## trauma 10, no civilian hit in four events; trauma 14, nineteen killed. Cycle 1.B fixed
+## the cascade in the sim (calm from the officer's own floor, check fire, GREEN at events),
+## so this is now a preference, not a safeguard: such officers still carry more stress into
+## the shift. The suggestion keeps them off crowd duty while anyone else is free, and the
+## briefing and Force tab say so (P1.B5).
 const CROWD_TRAUMA := 12.0
 
 

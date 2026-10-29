@@ -348,8 +348,34 @@ func _walk(seed_v: int) -> void:
 	if main.world != null:
 		main.world.dispose()
 		main.world = null
+	# EA_TASKS B4, found by the --verbose annotation (CI 40884831856, 4.4.1): the office
+	# ambience was still playing when the game was freed, and the audio server let go of
+	# its playback (and the .wav) only on its next mix -- after the engine counted what
+	# was still in use, or before it, depending on the audio thread. Stop every player
+	# and give the server a few frames first.
+	for p in main.find_children("*", "AudioStreamPlayer", true, false) + main.find_children("*", "AudioStreamPlayer2D", true, false):
+		p.stop()
+		p.stream = null
+	await frames(5)
 	root.remove_child(main)
 	main.free()
+	# EA_TASKS B4: the game keeps fonts, textures and sounds in static caches, and what a
+	# live operation puts in them depends on how many steps fit in a frame (runner
+	# speed). Held at shutdown, they are "resources still in use" -- seen once on CI,
+	# never in 18 local runs. Release them before quitting.
+	_release_static_caches()
 	# the renderer releases textures a few frames after their last user is gone
 	await frames(10)
 	quit(1 if not failures.is_empty() else 0)
+
+
+func _release_static_caches() -> void:
+	ThemeDB.fallback_font = null
+	for spec in [["res://scripts/view/decals.gd", "_tex"], ["res://scripts/view/sound.gd", "_cache"],
+			["res://scripts/ui/shorts.gd", "_cache"], ["res://scripts/campaign/city.gd", "_cached"]]:
+		var d = load(spec[0]).get(spec[1])
+		if d is Dictionary:
+			(d as Dictionary).clear()
+	for spec2 in [["res://scripts/view/floor_plan.gd", "_paper"], ["res://scripts/view/crayon.gd", "font"],
+			["res://scripts/ui/ui.gd", "_hand"]]:
+		load(spec2[0]).set(spec2[1], null)

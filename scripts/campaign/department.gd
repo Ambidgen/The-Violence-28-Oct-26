@@ -70,6 +70,8 @@ var deficit_weeks := 0
 var morale_home := Courses.MORALE0   # v0.9: where morale settles (the union's goodwill)
 var applicants: Array = []           # Q2: this week's applicant pool (full records, not yet officers)
 var applicant_week := 0              # the week the pool was rolled; unchosen applicants walk at week's end
+var emergency_week := 0              # EA_TASKS P1.C3: the week an emergency lateral was last signed (one a week)
+var keep_on_books := 0               # EA_TASKS P1.C4: standing order, officers to keep on the books (0: none)
 var curriculum: Array = []           # 1.3: habits department programs added to the academy (every hire learns them)
 var _founding := false
 var rng := RandomNumberGenerator.new()
@@ -213,6 +215,64 @@ func applicants_now() -> Array:
 	return applicants
 
 
+## EA_TASKS P1.C3: the emergency lateral. Whatever the pool holds, the chief can sign an
+## experienced officer from a neighbouring force who reports this week, at twice a
+## lateral's signing cost and one a week. The candidate is a full record (pay, habits,
+## personality all visible before signing), rolled from its own stream -- seeded by the
+## run and the week -- so offering one changes nothing else the department rolls.
+func emergency_candidate() -> Dictionary:
+	var keep_rng := rng
+	var keep_names = names
+	rng = RandomNumberGenerator.new()
+	rng.seed = hash([seed_val, week, "emergency lateral"])
+	names = Names.new(int(hash([seed_val, week, "emergency names"])) & 0x7fffffff)
+	var taken := {}
+	for o in officers:
+		taken[String(o["name"])] = true
+	var r := {}
+	for attempt in 6:
+		var yrs := float(rng.randi_range(3, 8))
+		r = _roll_record("Corporal" if yrs >= 5.0 else "Officer", rng.randi_range(6, 16), true, yrs, true)
+		if not taken.has(String(r["name"])):
+			break
+	rng = keep_rng
+	names = keep_names
+	r["emergency"] = true
+	return r
+
+
+## Why the emergency lateral cannot be signed now, or "".
+func emergency_blocked() -> String:
+	if frozen():
+		return "the account is in the red: hiring is frozen"
+	if emergency_week == week:
+		return "one emergency lateral a week, and this week's has signed"
+	return ""
+
+
+static func emergency_cost(r: Dictionary) -> int:
+	return Courses.EMERGENCY_LATERAL + int(r.get("issued", 0))
+
+
+## Sign this week's emergency lateral: on duty at once. Returns the record, or {}.
+func sign_emergency() -> Dictionary:
+	if emergency_blocked() != "":
+		return {}
+	var r := emergency_candidate()
+	r.erase("emergency")
+	serial += 1
+	r["id"] = "PC-%04d" % serial
+	r["hired_week"] = week
+	r["status"] = "active"
+	r["out_until"] = 0
+	r["file"].append({"week": week, "text": "Signed as an emergency lateral from a neighbouring force; on duty the same week."})
+	spend("Emergency lateral: %s" % r["name"], emergency_cost(r))
+	officers.append(r)
+	emergency_week = week
+	note("Signed %s %s as an emergency lateral." % [r["rank"].to_lower(), r["name"]])
+	return r
+
+
 ## What hiring this applicant costs today: the academy place or the lateral signing,
 ## plus the kit they are issued.
 static func applicant_cost(r: Dictionary) -> int:
@@ -267,6 +327,62 @@ func get_officer(oid: String) -> Dictionary:
 
 func available() -> Array:
 	return officers.filter(func(r): return r["status"] == "active")
+
+
+## Who will be fit when next week starts, by the rules next_week() applies (EA_TASKS
+## P1.C2): today's fit officers, plus the injured who are due back, graduates of the
+## academy, courses and suspensions that end -- less anyone free next week who starts a
+## queued course (Q9), which next_week() decides after the week's allocation and payroll,
+## in roster order, against the account as each course is paid for. Operations still to
+## run this week, and resignations (a roll), are not guessed at.
+func fit_next_week() -> Dictionary:
+	var nw: int = week + 1
+	var out := {"fit": 0, "back": 0, "graduates": 0, "returning": 0, "to_course": 0}
+	var acct: int = balance + allocation - payroll()
+	for r in officers:
+		var st := String(r.get("status", "active"))
+		var due: bool = int(r.get("out_until", 0)) <= nw
+		var studying: bool = String(r.get("course", "")) != ""
+		var course_done: bool = studying and int(r.get("course_until", 0)) <= nw
+		var why := ""
+		match st:
+			"active":
+				why = "fit"
+			"injured":
+				if due and (not studying or course_done):
+					why = "back"
+			"training":
+				if due or course_done:
+					why = "returning"
+			"academy":
+				if due:
+					why = "graduates"
+			"suspended":
+				if due:
+					why = "returning"
+		if why == "":
+			continue
+		if (not studying or course_done) and acct >= 0:
+			var cid := _first_startable(r)
+			if cid != "":
+				acct -= int(Courses.COURSES[cid]["cost"])
+				out["to_course"] += 1
+				continue
+		out["fit"] += 1
+		if why != "fit":
+			out[why] += 1
+	return out
+
+
+## The queued course an officer free next week would start: the first that still makes
+## sense (next_week() drops the others with a line).
+func _first_startable(r: Dictionary) -> String:
+	for cid in r.get("queue", []):
+		if not Courses.COURSES.has(cid):
+			continue
+		if Courses.blocked(r, cid) == "":
+			return String(cid)
+	return ""
 
 
 func note(text: String) -> void:
@@ -345,6 +461,53 @@ func recruit(lateral := false) -> Dictionary:
 		spend("Academy place: %s" % r["name"], Courses.RECRUIT + int(r["issued"]))
 	note("Hired %s %s%s." % [r["rank"].to_lower(), r["name"], " (lateral)" if lateral else " (academy until week %d)" % r["out_until"]])
 	return r
+
+
+## EA_TASKS P1.C4: the standing order "keep N officers on the books". At the turn of
+## each week, while fewer than N are on the books (on duty, injured, on a course, at the
+## academy or suspended), the academy takes a recruit -- if the four-week forecast stays
+## in the black after the academy place and four weeks of the recruit's pay. When it
+## cannot, the week's report says so; the order stays until the chief changes it.
+## Two recruits a week at most: the academy's intake, and no week's money all at once.
+const STANDING_INTAKE := 2
+
+
+func on_books() -> int:
+	return officers.filter(func(r): return String(r.get("status", "active")) in ["active", "injured", "training", "academy", "suspended"]).size()
+
+
+## Can the forecast carry one more recruit? Returns "" or why not.
+func standing_blocked() -> String:
+	if frozen():
+		return "the account is in the red"
+	var cost: int = Courses.RECRUIT + Equipment.cost(Equipment.default_kit())
+	var pay: int = Courses.PAY["Officer"]
+	var rows: Array = forecast(4)
+	for i in rows.size():
+		if int(rows[i]["balance"]) - cost - pay * (i + 1) < 0:
+			return "the four-week forecast cannot carry another recruit (week %d would end at $%s)" % [
+				int(rows[i]["week"]), money(int(rows[i]["balance"]) - cost - pay * (i + 1))]
+	return ""
+
+
+func _standing_order() -> Array:
+	var out: Array = []
+	if keep_on_books <= 0:
+		return out
+	var n := 0
+	while on_books() < keep_on_books and n < STANDING_INTAKE:
+		var why := standing_blocked()
+		if why != "":
+			out.append("Standing order (keep %d on the books, %d now): no recruit this week -- %s." % [keep_on_books, on_books(), why])
+			return out
+		var r := recruit(false)
+		if r.is_empty():
+			break
+		r["file"].append({"week": week, "text": "Enrolled by the standing order to keep %d on the books." % keep_on_books})
+		n += 1
+		out.append("Standing order: %s %s enrols at the academy (until week %d); %d of %d on the books." % [
+			r["rank"], r["name"], int(r["out_until"]), on_books(), keep_on_books])
+	return out
 
 
 ## Let an officer go: two weeks' severance, and the union remembers.
@@ -1046,6 +1209,7 @@ func next_week() -> Array:
 				lines.append("%s %s starts the %s course (it was queued)." % [r2["rank"], r2["name"], cc["name"].to_lower()])
 			else:
 				lines.append("%s %s comes off the %s queue: %s." % [r2["rank"], r2["name"], cc["name"].to_lower(), whyq])
+	lines.append_array(_standing_order())
 	# cases nobody decided close themselves
 	for c in cases:
 		if c["status"] == "open" and week - int(c["week"]) >= CASE_WEEKS:
@@ -1112,7 +1276,8 @@ func to_data() -> Dictionary:
 		"history": history.duplicate(true), "notes": notes.duplicate(true), "bonds": bonds.duplicate(),
 		"allocation": allocation, "balance": balance, "ledger": ledger.duplicate(true), "morale": morale,
 		"cases": cases.duplicate(true), "case_serial": case_serial, "deficit_weeks": deficit_weeks, "morale_home": morale_home,
-		"applicants": applicants.duplicate(true), "applicant_week": applicant_week, "curriculum": curriculum.duplicate()}
+		"applicants": applicants.duplicate(true), "applicant_week": applicant_week, "curriculum": curriculum.duplicate(),
+		"emergency_week": emergency_week, "keep_on_books": keep_on_books}
 
 
 ## One loaded record put back the way the game keeps it: JSON's floats back to ints,
@@ -1205,6 +1370,8 @@ func from_data(d: Dictionary) -> bool:
 		if a0 is Dictionary:
 			applicants.append(_fix_record(a0))
 	applicant_week = int(d.get("applicant_week", 0))
+	emergency_week = int(d.get("emergency_week", 0))
+	keep_on_books = int(d.get("keep_on_books", 0))
 	curriculum = []
 	for cg in (d.get("curriculum", []) if d.get("curriculum", []) is Array else []):
 		if cg is String:

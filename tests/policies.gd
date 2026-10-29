@@ -43,14 +43,15 @@ const CALL_PRIORITY := {"hostage": 0, "event": 1, "gang": 2, "barricade": 3, "wa
 const POLICIES := {
 	"cautious": {
 		"label": "cautious",
-		"desc": "Hire to 14, train, restraint contracts, no military hardware, answer the gravest two calls and keep high-trauma officers off crowd duty.",
+		"desc": "Hire to 14 (an emergency lateral below 12 fit, a standing order for 18 on the books), train, restraint contracts, no military hardware, answer the gravest two calls and keep high-trauma officers off crowd duty.",
 		"doctrine": ["liaison", "pie", "cams", "reserve", "union", "lines", "tactical", "plates"],
 		"contracts": ["restraint", "neutral"],
 		"max_contract": 5000,
 		"programs": ["crisis", "peer", "ED04", "GD03", "WD09", "ED06", "WD10"],
 		"offers": "by_gain",
 		"events": "cheapest",
-		"hire": {"on": true, "fit_below": 14, "min_balance": 9000, "prefer": "judgment", "max": 8},
+		"hire": {"on": true, "fit_below": 14, "min_balance": 9000, "prefer": "judgment", "max": 8,
+			"emergency_below": 12, "keep_on_books": 18},
 		"courses": {"on": true, "min_balance": 5000, "list": ["coaching", "judgment"]},
 		"ia": "discipline",
 		"issue_kit": false,
@@ -65,7 +66,8 @@ const POLICIES := {
 		"programs": [],
 		"offers": "decline_all",
 		"events": "no_cost",
-		"hire": {"on": false, "fit_below": 0, "min_balance": 0, "prefer": "any", "max": 0},
+		"hire": {"on": false, "fit_below": 0, "min_balance": 0, "prefer": "any", "max": 0,
+			"emergency_below": 0, "keep_on_books": 0},
 		"courses": {"on": false, "min_balance": 0, "list": []},
 		"ia": "lapse",
 		"issue_kit": false,
@@ -73,14 +75,15 @@ const POLICIES := {
 	},
 	"military": {
 		"label": "military-first",
-		"desc": "Military contracts and kit, Kettering's offers, cases cleared, hire to 16, three calls a week including crowd events.",
+		"desc": "Military contracts and kit, Kettering's offers, cases cleared, hire to 16 (an emergency lateral below 12 fit), three calls a week including crowd events.",
 		"doctrine": ["plates", "tactical", "reserve", "union", "cams", "lines", "pie", "liaison"],
 		"contracts": ["military", "neutral"],
 		"max_contract": 8000,
 		"programs": ["inservice", "GD03", "PF03", "WD09", "ED04"],
 		"offers": "military",
 		"events": "rich",
-		"hire": {"on": true, "fit_below": 16, "min_balance": 6000, "prefer": "lateral", "max": 8},
+		"hire": {"on": true, "fit_below": 16, "min_balance": 6000, "prefer": "lateral", "max": 8,
+			"emergency_below": 12, "keep_on_books": 0},
 		"courses": {"on": true, "min_balance": 4000, "list": ["coaching", "firearms"]},
 		"ia": "protect",
 		"issue_kit": true,
@@ -88,14 +91,15 @@ const POLICIES := {
 	},
 	"accept_all": {
 		"label": "accept-all",
-		"desc": "Sign the cheapest contract and program on the desk, accept every offer and answer every event, hire to 18, let plans buy kit, three calls a week.",
+		"desc": "Sign the cheapest contract and program on the desk, accept every offer and answer every event, hire to 18 (a standing order for 20 on the books), let plans buy kit, three calls a week.",
 		"doctrine": ["reserve", "plates", "pie", "liaison", "union", "cams", "tactical", "lines"],
 		"contracts": ["restraint", "neutral", "military"],
 		"max_contract": 0,
 		"programs": ["crisis", "inservice", "peer", "GD03", "ED04", "WD09"],
 		"offers": "accept_all",
 		"events": "first",
-		"hire": {"on": true, "fit_below": 18, "min_balance": 4000, "prefer": "lateral", "max": 10},
+		"hire": {"on": true, "fit_below": 18, "min_balance": 4000, "prefer": "lateral", "max": 10,
+			"emergency_below": 0, "keep_on_books": 20},
 		"courses": {"on": true, "min_balance": 3500, "list": ["coaching"]},
 		"ia": "review",
 		"issue_kit": true,
@@ -322,6 +326,16 @@ static func hiring(c, policy: String) -> Array:
 		return lines
 	var target: int = int(rule["fit_below"])
 	var floor_money: int = int(rule["min_balance"])
+	# EA_TASKS P1.C4: the standing order is set like the player sets it, on the Roster
+	c.dept.keep_on_books = int(rule.get("keep_on_books", 0))
+	# EA_TASKS P1.C3: short of officers this week, sign the emergency lateral (on duty now)
+	var below: int = int(rule.get("emergency_below", 0))
+	if below > 0 and c.dept.available().size() < below and c.dept.emergency_blocked() == "":
+		var cand: Dictionary = c.dept.emergency_candidate()
+		if int(c.dept.balance) - Department.emergency_cost(cand) >= floor_money:
+			var em: Dictionary = c.dept.sign_emergency()
+			if not em.is_empty():
+				lines.append("Signed %s %s (emergency lateral)." % [String(em.get("rank", "")).to_lower(), String(em.get("name", ""))])
 	var made := 0
 	while made < int(rule["max"]):
 		var booked: int = c.dept.available().size() + c.dept.officers.filter(func(r): return String(r["status"]) == "academy").size()

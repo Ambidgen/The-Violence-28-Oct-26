@@ -328,7 +328,7 @@ static func build_planned(sit: Dictionary, plan: Dictionary, dept, level, nav) -
 		orders_rt.append(od)
 		var ak: String = nav.avoid_key(od.get("avoid", []))
 		for k in members.size():
-			var c: Dictionary = dept.to_cfg(members[k], slot, level, 1)
+			var c: Dictionary = dept.to_cfg(members[k], slot, level, police_alert(sit))
 			c["id"] = "A%d" % (slot + 1)
 			c["slot"] = slot
 			c["pos"] = pts[k]
@@ -358,7 +358,7 @@ static func build_planned(sit: Dictionary, plan: Dictionary, dept, level, nav) -
 		opts["event"] = {"attack_t": float(sit.get("attack_t", -1)) if sit.get("attack", false) else -1.0,
 			"crowd": crowd_pts.slice(0, 12), "duration": float(sit.get("duration", 900))}
 		opts["time_limit"] = float(sit.get("duration", 900))
-	return {"cfgs": cfgs, "opts": opts, "postures": ["assault", "hold"], "alerts": [1, 0], "seed": int(sit["seed"]),
+	return {"cfgs": cfgs, "opts": opts, "postures": ["assault", "hold"], "alerts": [police_alert(sit), 0], "seed": int(sit["seed"]),
 		"ids": ids}
 
 
@@ -420,3 +420,13 @@ static func _orders_runtime(od0: Dictionary, level, nav, sit: Dictionary, ids: D
 		objs.append(ob)
 	od["objs"] = objs
 	return od
+
+
+## The alert officers start an operation at (each officer's floor, and the team's base).
+## Officers on post at a public event start relaxed (GREEN: holstered or low carry), not
+## at the ready (EA_TASKS P1.B). At YELLOW a weapon "shows", and a crowd member who sees
+## a weapon showing is alarmed and runs: the 1.B trace found quiet rallies with no
+## attacker in which the crowd was fleeing from the police's own guns within seven
+## seconds, and a running face is judged afresh. Drawing from GREEN costs 0.45-0.9 s.
+static func police_alert(sit: Dictionary) -> int:
+	return 0 if String(sit.get("type", "")) == "event" else 1

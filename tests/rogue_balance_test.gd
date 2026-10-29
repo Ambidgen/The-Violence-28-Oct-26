@@ -7,6 +7,7 @@ extends SceneTree
 ##   ... -- --seeds=3 --policy=cautious,military --weeks=40 --json=build/balance --jobs=4
 ##   ... -- --smoke                      # 1 seed x 4 policies x 2 weeks, quick tier
 ##   ... -- --one=1001:cautious --out=...  # internal: one run in this process
+##   ... -- --merge=DIR1,DIR2 --json=OUT --seeds=20 --first=1001   # combine shards (no runs)
 ##
 ## Options
 ##   --seeds=N        how many seeds (default 20; seed numbers are 1001, 2002, 3003, ...)
@@ -20,6 +21,11 @@ extends SceneTree
 ##   --enforce        miss a band and exit 1 (the file says report-only until P1.I)
 ##   --timeout=S      seconds one run may take before it is killed (default 3600; smoke 300)
 ##   --smoke          the quick-tier shakedown: 1 seed, all policies, 2 weeks
+##   --merge=DIRS     combine the run-*.json of shard directories into one report and
+##                    summary.json (written to --json); plays nothing. With --seeds and
+##                    --first, a seed x policy with no JSON is reported as broken, and so
+##                    is anything a shard's own summary.json lists as broken. A GitHub job
+##                    stops at 6 hours, so the 20-seed baseline runs as shards (EA_TASKS P1.A4).
 ##
 ## Exit: 0 all runs finished and every band held (or bands are report-only); 1 a run
 ## hung, never reached the election, wrote no JSON, or (with --enforce) a band missed.
@@ -93,6 +99,7 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 	var tot_score := 0
 	var tot_findings := 0
 	var desk_lines: Array = []
+	var op_log: Array = []      # one row per operation (EA_TASKS P1.C1)
 	while not c.over() and c.dept.week <= weeks_wanted:
 		var op_lines: Array = []   # ally lines from this week's operations (before end_week)
 		var wk: int = int(c.dept.week)
@@ -144,6 +151,7 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 				if _ally_line(ln2):
 					op_lines.append(String(ln2))
 			c.record(s["id"], res)
+			op_log.append(_op_row(wk, s, lv, w, res, summary))
 			w.dispose()
 		# 4. the week closes: payroll, allocation, consequences, the next board
 		var end_lines: Array = c.end_week()
@@ -177,7 +185,7 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 		"officers_down_per_op": snappedf(float(tot_down) / maxf(1.0, float(ops_ran)), 0.01),
 		"mean_op_score": tot_score / maxi(1, ops_ran),
 		"record": c.politics.record.duplicate(), "election": {}, "run_score": {},
-		"desk": desk_lines.size(), "weeks": weeks,
+		"desk": desk_lines.size(), "weeks": weeks, "op_log": op_log,
 	}
 	if c.over():
 		var e: Dictionary = c.politics.result["ending"]
@@ -185,6 +193,73 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 			"votes": c.politics.result["votes"], "head": String(e["head"])}
 		out["run_score"] = Rogue.run_score(c)
 	return out
+
+
+## Every operation of every run, one line each (EA_TASKS P1.C1), small enough to commit
+## with the report: the per-run JSON is only the CI run's artifact. (Numbers read back
+## from JSON are floats; whole ones are written as integers.)
+const OPS_COLS := ["seed", "policy", "week", "type", "map", "map_name", "officers", "down", "killed",
+	"killed_by_suspect", "killed_by_friendly", "bled_out", "suspects", "suspects_killed", "civ_killed",
+	"kind", "score", "sim_s", "ended"]
+
+
+func _ops_csv(runs: Array) -> String:
+	var out: PackedStringArray = [",".join(OPS_COLS)]
+	var sorted_runs := runs.duplicate()
+	sorted_runs.sort_custom(func(a, b): return [int(a["seed"]), String(a["policy"])] < [int(b["seed"]), String(b["policy"])])
+	for r in sorted_runs:
+		for o in r.get("op_log", []):
+			var kb: Dictionary = o["killed_by"]
+			var row := [int(r["seed"]), String(r["policy"]), o["week"], o["type"], o["map"],
+				"\"%s\"" % String(o["map_name"]).replace("\"", "'"), o["officers"], o["down"], o["killed"],
+				kb["suspect"], kb["friendly"], kb["bled_out"], o["suspects"], o["suspects_killed"], o["civ_killed"],
+				o["kind"], o["score"], o["sim_s"], 1 if o["ended"] else 0]
+			out.append(",".join(row.map(func(x): return str(int(x)) if (x is float and x == floorf(x)) else str(x))))
+	return "\n".join(out) + "\n"
+
+
+## Every run's week-end roster and account, one line a week (EA_TASKS P1.C1: injury weeks
+## lost, academy throughput, the fit curve).
+const WEEK_COLS := ["seed", "policy", "week", "fit", "injured", "academy", "dead_total", "balance", "morale"]
+
+
+func _weeks_csv(runs: Array) -> String:
+	var out: PackedStringArray = [",".join(WEEK_COLS)]
+	var sorted_runs := runs.duplicate()
+	sorted_runs.sort_custom(func(a, b): return [int(a["seed"]), String(a["policy"])] < [int(b["seed"]), String(b["policy"])])
+	for r in sorted_runs:
+		for wk in r.get("weeks", []):
+			out.append(",".join([int(r["seed"]), String(r["policy"]), int(wk["week"]), int(wk["fit"]), int(wk["injured"]),
+				int(wk["academy"]), int(wk["dead_total"]), int(wk["balance"]), int(wk["morale"])].map(func(x): return str(x))))
+	return "\n".join(out) + "\n"
+
+
+## One operation for the roster-bleed measurement (EA_TASKS P1.C1): what it was, where,
+## how many went, who went down and how (killed by a suspect, by a colleague, or bled out
+## with nobody named), and how it ended.
+func _op_row(wk: int, s: Dictionary, lv, w, res: Dictionary, summary: Dictionary) -> Dictionary:
+	var by_cause := {"suspect": 0, "friendly": 0, "bled_out": 0}
+	var down_cause := {"suspect": 0, "friendly": 0, "other": 0}
+	var police := {}
+	for o in w.ops:
+		if o.judges:
+			police[o.id] = true
+	for f in w.incident.findings:
+		var kind := String(f["kind"])
+		if kind != "officer_killed" and kind != "officer_down":
+			continue
+		var by := String(f["by"])
+		var cause := "bled_out" if by == "" else ("friendly" if police.has(by) else "suspect")
+		if kind == "officer_killed":
+			by_cause[cause] += 1
+		else:
+			down_cause["other" if cause == "bled_out" else cause] += 1
+	return {"week": wk, "type": String(s["type"]), "map": int(s["map"]), "map_name": String(lv.map_name),
+		"officers": int(summary["officers"]), "down": int(summary["officers_down"]),
+		"killed": int(summary["officers_killed"]), "killed_by": by_cause, "down_by": down_cause,
+		"suspects": int(summary["suspects"]), "suspects_killed": int(summary["suspects_killed"]),
+		"civ_killed": int(summary["civ_killed"]), "kind": String(res.get("kind", "")),
+		"score": int(res.get("score", 0)), "sim_s": snappedf(float(w.t), 0.1), "ended": bool(w.over)}
 
 
 func _child(args: Dictionary) -> int:
@@ -213,6 +288,8 @@ func _child(args: Dictionary) -> int:
 
 # ================================================================== the matrix
 func _parent(args: Dictionary) -> int:
+	if args.has("merge"):
+		return _merge(args)
 	var smoke := args.has("smoke")
 	var policy_list: Array = Policies.parse(String(args.get("policy", "all")))
 	if policy_list.is_empty():
@@ -308,6 +385,15 @@ func _parent(args: Dictionary) -> int:
 			broken.append("seed %d %s: unreadable JSON" % [int(job2["seed"]), String(job2["policy"])])
 			continue
 		runs.append(parsed)
+	return _finish(runs, broken, policy_list, weeks, n_seeds, Time.get_ticks_msec() - t0, out_dir,
+		bands_path, enforce, done)
+
+
+## Everything after the runs: breakage, bands, the report and summary.json, the exit code.
+## Shared by a matrix that played its runs and by --merge, so a merged report and a
+## single-process report of the same runs are the same document.
+func _finish(runs: Array, broken: Array, policy_list: Array, weeks: int, n_seeds: int, wall: int,
+		out_dir: String, bands_path: String, enforce: bool, done: int) -> int:
 	for r2 in runs:
 		var why: Array = breakage(r2, weeks)
 		for w2 in why:
@@ -327,7 +413,6 @@ func _parent(args: Dictionary) -> int:
 		band_lines = res["lines"]
 		misses = int(res["misses"])
 
-	var wall := Time.get_ticks_msec() - t0
 	var report := _report(by_policy, policy_list, weeks, n_seeds, runs.size(), wall, band_lines, bands, misses, enforce, broken)
 	_write_text("%s/report.md" % out_dir, report)
 	_write_json("%s/summary.json" % out_dir, {
@@ -337,6 +422,8 @@ func _parent(args: Dictionary) -> int:
 		"misses": misses, "broken": broken,
 		"derived": by_policy,
 	})
+	_write_text("%s/ops.csv" % out_dir, _ops_csv(runs))
+	_write_text("%s/weeks.csv" % out_dir, _weeks_csv(runs))
 	print(report)
 	print("rogue_balance: %d run(s) in %d s, %d broken, %d band miss(es) -> %s" % [
 		runs.size(), int(wall / 1000), broken.size(), misses, out_dir])
@@ -348,6 +435,71 @@ func _parent(args: Dictionary) -> int:
 	if runs.is_empty() or done == 0:
 		return 1
 	return 0
+
+
+## --merge: the runs of several shard directories as one matrix (EA_TASKS P1.A4).
+func _merge(args: Dictionary) -> int:
+	var dirs: Array = String(args["merge"]).split(",", false)
+	var out_dir := String(args.get("json", "build/balance"))
+	if not out_dir.is_absolute_path():
+		out_dir = ProjectSettings.globalize_path("res://").path_join(out_dir)
+	if not DirAccess.dir_exists_absolute(out_dir):
+		DirAccess.make_dir_recursive_absolute(out_dir)
+	var weeks := int(args.get("weeks", "40"))
+	var runs: Array = []
+	var broken: Array = []
+	var seen := {}
+	var wall := 0
+	for d in dirs:
+		var dir := String(d)
+		if not dir.is_absolute_path():
+			dir = ProjectSettings.globalize_path("res://").path_join(dir)
+		var da := DirAccess.open(dir)
+		if da == null:
+			broken.append("shard %s: no such directory" % dir)
+			continue
+		# what the shard itself knew went wrong (a run that timed out left no JSON)
+		if FileAccess.file_exists(dir.path_join("summary.json")):
+			var sm = JSON.parse_string(FileAccess.get_file_as_string(dir.path_join("summary.json")))
+			if sm is Dictionary:
+				wall = maxi(wall, int(sm.get("wall_ms", 0)))   # shards run side by side
+				for b in sm.get("broken", []):
+					broken.append("shard %s: %s" % [dir.get_file(), String(b)])
+		for f in da.get_files():
+			if not (f.begins_with("run-") and f.ends_with(".json")):
+				continue
+			var parsed = JSON.parse_string(FileAccess.get_file_as_string(dir.path_join(f)))
+			if not (parsed is Dictionary) or not parsed.has("seed") or not parsed.has("policy"):
+				broken.append("shard %s: %s is unreadable" % [dir.get_file(), f])
+				continue
+			var key := "%d:%s" % [int(parsed["seed"]), String(parsed["policy"])]
+			if seen.has(key):
+				broken.append("seed %d %s appears in two shards" % [int(parsed["seed"]), String(parsed["policy"])])
+				continue
+			seen[key] = true
+			runs.append(parsed)
+	var policy_list: Array = []
+	var wanted: Array = Policies.parse(String(args.get("policy", "all")))
+	for pol in wanted:
+		if runs.any(func(r): return String(r["policy"]) == String(pol)) or args.has("seeds"):
+			policy_list.append(String(pol))
+	var seeds := {}
+	for r in runs:
+		seeds[int(r["seed"])] = true
+	var n_seeds := seeds.size()
+	if args.has("seeds"):
+		# the matrix that was asked for: every seed x policy must be there
+		n_seeds = int(args["seeds"])
+		var first := int(args.get("first", "1001"))
+		for i in n_seeds:
+			for pol2 in policy_list:
+				var key2 := "%d:%s" % [first + i * SEED_STEP, String(pol2)]
+				if not seen.has(key2):
+					broken.append("seed %d %s: no run in any shard" % [first + i * SEED_STEP, String(pol2)])
+	runs.sort_custom(func(a, b): return int(a["seed"]) * 10 + policy_list.find(String(a["policy"])) < int(b["seed"]) * 10 + policy_list.find(String(b["policy"])))
+	print("rogue_balance: merging %d run(s) from %d shard(s) -> %s" % [runs.size(), dirs.size(), out_dir])
+	return _finish(runs, broken, policy_list, weeks, n_seeds, wall, out_dir,
+		String(args.get("bands", BANDS_PATH)), args.has("enforce"), runs.size())
 
 
 # ================================================================== derived numbers

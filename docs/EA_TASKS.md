@@ -102,7 +102,11 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 - **Cost note:** one 40-week run took 10–15 minutes on two cores here, so 80 runs is about 7–10 h on two cores or about 2 h on eight. Use the 3-seed smoke during cycles and the full run overnight or in weekly CI.
 - **Exit:** the baseline reproduces the playtest's shape (fit collapses, deficits, allies lost). If it doesn't, the policies don't match the game yet.
 
+- **2026-10-29 correction (verified before 1.B):** the 20-seed baseline could not have finished as configured. A GitHub-hosted job stops at **6 hours** whatever `timeout-minutes` says ([GitHub: Actions limits](https://docs.github.com/en/actions/reference/actions-limits)), and the estimate above is 7–11 h, so the 18-hour setting would have been cut at 6. The `balance` job is now **sharded**: `balance-plan` splits the seeds into shards of four (20 seeds → 5 shards, seeds 1001…20020, the same set a single run uses), each shard is one job of 16 runs (1.4–2.3 h at the measured rate, limit 340 min), and `balance-merge` joins them with the harness's new **`--merge`** mode and commits the report as before. Checked: two one-seed shards merge to the two-seed report byte for byte apart from the wall clock (the per-run `derived` rows differ only in `wall_ms`), and a merge with a shard missing exits 1 naming each absent seed × policy. The baseline is dispatched from its own branch, so later pushes cannot cancel it (the workflow cancels superseded runs per ref).
+
 **Status 2026-10-28: built, run end to end, and the shape matches the playtest; the 20-seed baseline is the one step left.**
+
+**2026-10-29: the 20-seed baseline has run (P1.A4 done).** CI run 40857790338 on branch `baseline-1A` (commit 1b3bf45): 80 runs in five shards of four seeds (1.3–2.2 h each, inside the 6 h cap), merged by `balance-merge` with **0 broken runs** and committed as `tests/results/cycle-1A/baseline/report.md` and `summary.json` (the per-run JSON is the run's artifact). The exit holds — the shape is the playtest's at scale: lowest fit 4–9 on average across policies, 11–26 weeks under 12 fit, every policy but `minimal` ends in the red, 2.8–3.9 allies lost at the end and none won back, **10.2–15.8 civilians killed per run**, the chief kept 8–16 times in 20. 4 of 52 band checks pass (all report-only). Every later cycle reports against this file; a later cycle's own matrix goes to its own folder (`Run workflow` → tier=balance, `results=tests/results/cycle-1X/...`).
 
 | ID | What was built | File |
 |---|---|---|
@@ -116,7 +120,7 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 - **Wall clock: 21–34 minutes per 40-week run**, measured across four pilots (8 runs each, 2246–4069 s, identical tables). Four at a time is 37–68 minutes per two seeds, so the 20-seed matrix is **7–11 h** — the balance job's limit is now 18 h (300 minutes would have killed it, and 12 h would have been tight), and the weekly drift check runs 8 seeds rather than 20.
 - **Exit:** the baseline reproduces the playtest's shape (fit collapses, deficits, allies lost). The pilot already shows that shape; what the 20-seed baseline adds is the variance across seeds, which is what P1.I's thresholds have to be set against. `accept-all`'s money numbers are the one outlier worth watching at scale.
 
-### Cycle 1.B — Crowd cliff *(root cause located)*
+### Cycle 1.B — Crowd cliff *(done 2026-10-29 — the attack-response exit is missed by 3–5 s: owner's call)*
 **Diagnosis.**
 - `department.gd:771` sets `stress0 = min(0.3, trauma × 0.015)`.
 - Line 776 adds `(60 − morale) / 1200`.
@@ -138,6 +142,36 @@ So at **trauma ≥ 13.4** (≈ 11.7 at morale 30) an officer can never be calm. 
   - ≤ 1 distinct civilian struck per quiet event over 20 seeds at trauma 14 and 20.
   - Natural trauma at or below baseline.
   - On attack seeds, the attacker is engaged no later than baseline and attacker casualties are no worse.
+
+**Status 2026-10-29: the crowd cliff is gone; attacks are answered a few seconds later than before.** Measured with the CI crowd tier (`Run workflow` → tier=crowd): 60 seeds per condition, quiet and attacked events, trauma 0 / 14 / 20, morale 60, two officers on post. Before = e257aa0 (the probe and sweep only, branch `crowd-before-1B`); after = this cycle's head. Tables and per-event JSON: `tests/results/cycle-1B/`.
+
+| | trauma 0 | trauma 14 | trauma 20 |
+|---|---|---|---|
+| **Quiet:** civilians struck by police (most in one event), before → after | 6 (3) → **2 (1)** | 413 (16) → **1 (1)** | 443 (18) → **5 (1)** |
+| **Quiet:** killed by police | 6 → **1** | 358 → **0** | 376 → **0** |
+| **Attacked:** struck by police / killed by police | 24 / 12 → **10 / 4** | 231 / 85 → **25 / 7** | 277 / 121 → **23 / 11** |
+| **Attacked:** attacker stopped | 59/60 → **60/60** | 55/60 → **56/60** | 58/60 → **57/60** |
+| **Attacked:** median s to stop him (p75) | 3.9 (8.7) → **8.9 (13.7)** | 4.3 (10.3) → **7.4 (11.8)** | 4.6 (12.2) → **9.8 (15.8)** |
+| **Attacked:** people the attacker hit | 88 → **115** | 88 → **94** | 96 → **129** |
+
+- **Exit 1 (≤ 1 civilian struck per quiet event at trauma 14 and 20): met**, over 60 seeds rather than 20.
+- **Exit 2 (natural trauma no worse): met** — trauma 0 quiet events went from 6 struck to 2, and the three natural-trauma seeds (5051, 5068, 5119) have no misjudgment.
+- **Exit 3 (attacker engaged no later, his casualties no worse): missed on time, within noise on casualties.** Paired by seed, the attacker hits +0.45 / +0.10 / +0.55 more people per event (95% bootstrap intervals −0.37…1.2, −0.5…0.68, −0.2…1.35; pooled +0.37, −0.06…0.79), but he is stopped a median 3–5 s later. Everyone else in an attacked event is far safer: bystanders struck (by the attacker plus by police), 804 → 396; bystanders killed by anyone, 365 → 147. The cause is the posture itself: relaxed officers recognise 1.3× slower and draw from the holster, and the faster response before 1.B came from officers with weapons already raised at the crowd — the thing that scattered and killed it. Getting the seconds back means choosing a different posture (a visible-but-low ready, a third alert state, or a plan option the player picks per event); that is a design decision, logged as **P1.B6** below.
+
+What was built, against the plan:
+
+| ID | Built | Where |
+|---|---|---|
+| P1.B1 | `event_probe.gd` rewritten: **distinct** people struck (`civ_struck`), deaths among people police struck (a casualty who bleeds out has no shooter on record, so the old count missed them), `--attack` (an armed attacker at t=300, forced if the event dealt none), `stopped`, `stop_s`, `civ_struck_by_attacker`, `--json`. `tools/crowd_sweep.py` runs it in parallel and prints the table; the CI **crowd** tier runs 18 jobs (3 trauma × quiet/attacked × 3 seed blocks of 20) and commits the table. | `tests/event_probe.gd`, `tools/crowd_sweep.py`, `ci.yml` |
+| P1.B2 | **Fix A as planned:** `calm` is measured from the officer's own floor (`stress − stress0 < 0.2`). | `world.gd misjudge_p()` |
+| P1.B3 | **Fix B, narrower than planned:** a police round that strikes a bystander calls **check fire** for that team for 20 s — every officer drops the threat verdicts he holds on bystanders and people giving up (a wrong verdict used to last the whole operation) and nobody in the crowd can be newly misjudged while it lasts. The planned stress halving and rally reset were not needed once the verdicts are dropped: seed 5170 at trauma 20 went from 8 struck / 3 killed to 1 / 0. | `world.gd _check_fire()`, `_judge()`, `_hit()` |
+| P1.B4 | `crowd_trace.gd` as planned. What it found: the natural-trauma deaths were not trauma at all — officers at the ready held a weapon on face after face, the crowd saw guns and ran, and running people get misjudged. That gave two fixes the plan did not have (C and C2). | `tests/crowd_trace.gd` |
+| — | **C: police at a public event start relaxed (GREEN)**, set per officer from the situation (`Operation.police_alert`), and posts honour the team's base alert instead of forcing YELLOW. **C2:** a relaxed officer watches a bystander or someone giving up whom he has not judged a threat — he does not raise his weapon at them (judgment still runs). | `operation.gd`, `brain.gd _set_posts`, `_relaxed_watch()` |
+| — | **The attack response**, to pay for C: a bystander who sees an attacker's gun cues relaxed officers within 30 m who can see him (*crowd cue*); once an attack has begun, an officer who has judged the attacker a threat keeps him over bystanders running past (*shooter first*); and posted officers who cannot see him move at a run to where the team last saw him or last heard gunfire (*to the shots*). The last one also fixes something older: before 1.B, 1–5 attackers in 60 were never stopped because police held their posts for the rest of the event while he shot out of their sight. | `world.gd crowd_cue()`, `civ_brain.gd`, `brain.gd _visible_shooter()`, `_to_the_shots()` |
+| P1.B5 | Suggest-a-plan still prefers officers under trauma 12 for crowd duty. The briefing now says so, and why, and the Force tab line reads "Suggest a plan keeps this officer off crowd duty while others are free (carries stress into the shift)" instead of a warning the fix made untrue. | `ops_ui.gd`, `autoplan.gd` |
+| P1.B6 | **Open — owner's decision:** the posture at events. Options: accept 3–5 s; a low-ready state (weapon out, not pointed, seen by the crowd as less alarming than aiming); or a per-event plan option ("visible presence" vs "low profile") whose cost the player chooses. | `op.gd`, `civ_brain._unaware`, plan UI |
+
+- **The rest of the build:** `--quick` passes on 4.7.2 locally, including the balance smoke. These changes alter every event that has a crowd, so campaign numbers move: the 1.B balance matrix (`results=tests/results/cycle-1B/balance`) is the comparison with the 1.A baseline's 10.2–15.8 civilians killed per run.
 
 ### Cycle 1.C — Roster bleed
 | ID | Task | Files | Size |
@@ -383,7 +417,7 @@ So at **trauma ≥ 13.4** (≈ 11.7 at morale 30) an officer can never be calm. 
 |---|---|---|---|---|
 | B1 | 0.A full tier | **Wolf brain backwards:** a lone fighter in an unseen fight spends 0.19 of it hidden with the wolf brain on vs 0.28 off (gate wants more). | `scripts/sim/brain.gd` (wolf), `tests/brains_test.gd --only=wolf --n=24 --v` | fix in Phase 1 (sim changes are rebaselined together in P1.I1) |
 | B2 | 0.A full tier | **Shield lets more through:** rounds reaching an officer facing 3 rifles at 10 m: 1.02 with the shield vs 0.69 without (gate wants fewer). | `world.gd` shield block / `_notice_shield_stop`, `equip_test.gd` shield case | Phase 1 |
-| B4 | first GitHub CI run | **Intermittent quick-tier failure on Godot 4.4.1:** the first CI run (16a76a2) failed one quick-tier suite on 4.4.1 after 7½ minutes; the next run (acace9d) and a local 4.4.1 run passed 17/17. The suite is unknown (the job log could not be read from the sandbox). Failed suites are now reported as annotations, so the next occurrence names itself. | CI annotations on the commit; `gh api repos/.../check-runs/<job>/annotations` | Phase 0 follow-up: if it recurs, fix or quarantine it |
+| B4 | CI runs 16a76a2 and 55032f9 (`arena/2e7808b8`) | **Intermittent `ui_walk` exit error:** once each on 4.4.1 and 4.7.2, the walk passed every check and then logged `ERROR: N resources still in use at exit`, which fails the suite. Not reproduced in 18 local runs (headless, rendered, and four at once on two cores with `--verbose`). Hypothesis: the game's static caches (`decals._tex`, `sound._cache`, `shorts._cache`, `city._cached`, `floor_plan._paper`, the crayon and UI fonts, `ThemeDB.fallback_font`) fill differently with runner speed during a live operation and are still held at shutdown. 2026-10-29: the walk now releases them before quitting. **Unproven** — watch the annotations; if it recurs, the annotation names the suite. **2026-10-29: recurred** once on 4.7.2 after the release (CI run 40868629763, commit e257aa0: `1 resources still in use at exit`, down from N), so at least one holder is left. `run_tests.sh` now runs the walk with `--verbose`, which makes Godot name each resource still in use, and the annotation includes those lines: the next recurrence names it. **It did, the same day** (CI 40884831856, 4.4.1): `Leaked instance: AudioStreamWAV … res://assets/sfx/amb_office.wav` and its `AudioStreamPlaybackWAV` — the office ambience was still playing when the walk freed the game, and the audio server released the playback on its own next mix, before or after the engine's count depending on the audio thread. The walk now stops every audio player and waits five frames before freeing. **Fix applied, cause named; closes when CI stays clean.** | `tests/ui_walk.gd` `_release_static_caches()` | Phase 0 follow-up |
 | B3 | 0.A full tier | **Beanbag slows the arrest:** 224 s to cuff a non-compliant unarmed man with beanbags vs 208 s without (gate wants less). | less-lethal-first order, `equip_test.gd` beanbag case | Phase 1 |
 
 ## Order and overlap

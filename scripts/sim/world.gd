@@ -1246,7 +1246,9 @@ func _judge(o, e) -> void:
 		if t < j["until"]:
 			return
 		if e.civ or e.complying:
-			if rng.randf() < misjudge_p(o, e):
+			# no new mistake while the team is checking fire (and no roll, so the
+			# sequence of random numbers is unchanged when check fire never happens)
+			if not check_fire_on(o) and rng.randf() < misjudge_p(o, e):
 				j["v"] = "threat"
 				o.misjudged[e.id] = true
 				say("%s judges %s (%s) a threat" % [o.id, e.id, "a civilian" if e.civ else "giving up"], "bad")
@@ -1283,11 +1285,47 @@ func judge_time(o, e) -> float:
 	return maxf(0.05, jt * o.m_h)
 
 
+## Check fire (EA_TASKS P1.B3): a police round has struck a bystander. Every officer on
+## that team drops the threat verdicts he holds on bystanders and people giving up (a
+## wrong verdict used to last the whole operation: an officer fired again a minute later
+## at people he had misjudged), and for CHECK_FIRE_S nobody in the crowd can be newly
+## judged a threat by mistake. A revealed attacker is not a civilian, and anyone shooting
+## or showing a weapon is judged on that, so a real threat is still answered.
+const CHECK_FIRE_S := 20.0
+func _check_fire(shooter) -> void:
+	var tm: Dictionary = teams[shooter.team]
+	var fresh: bool = t >= float(tm.get("check_fire_until", -1.0))
+	tm["check_fire_until"] = t + CHECK_FIRE_S
+	for m in tm["members"]:
+		if not m.alive():
+			continue
+		for pid in m.misjudged.keys():
+			m.judged.erase(pid)
+			m.ticker.erase("late_" + pid)
+			if m.aim.get("tid", "") == pid:
+				m.aim = {}
+		m.misjudged.clear()
+	if fresh:
+		say("%s: CHECK FIRE! civilian hit" % shooter.id, "comms")
+		mark("Check fire: a civilian was hit", "check_fire")
+
+
+func check_fire_on(o) -> bool:
+	return t < float(teams[o.team].get("check_fire_until", -1.0))
+
+
 ## Chance that judging a civilian (or someone giving up) ends in "threat".
 func misjudge_p(o, e) -> float:
 	var eff: float = o.stress * (1.0 - o.ech["resist"])
 	var p: float = 0.003 + 0.12 * eff + 0.002 * (50.0 - o.judgment)
-	var calm: bool = not in_combat(o) and o.stress < 0.2
+	# Calm is measured from the officer's own floor (EA_TASKS P1.B2). Trauma and low
+	# morale raise the floor stress never decays below (Department.to_cfg: trauma x
+	# 0.015, plus a morale term); against a fixed 0.2 an officer with trauma 14 or more
+	# (about 12 at morale 30) could never be calm again, so every face in a crowd he
+	# had already cleared was judged afresh every ten seconds, and a quiet rally ended
+	# in a cascade. Trauma still raises the base chance above (through eff).
+	var floor_s: float = float(o.ech.get("stress0", 0.0))
+	var calm: bool = not in_combat(o) and o.stress - floor_s < 0.2
 	# a phone held up: a real risk to someone keyed up, small to a calm officer (v0.7.7)
 	if e.civ and e.cstate == "film":
 		p += 0.04 if not calm else 0.005
@@ -2850,6 +2888,25 @@ func emit_sound(src, kind: String) -> void:
 		brain.on_heard(o, p, kind)
 
 
+## A bystander has just recoiled from a gun at p that is not a police weapon (EA_TASKS
+## P1.B). Officers within CROWD_CUE_R who can see him come to the ready and look where
+## he looks: the reaction of a crowd is how officers relaxed on post at a public event
+## learn that someone in it has drawn. (Officers at the ready are already scanning.)
+const CROWD_CUE_R := 30.0
+func crowd_cue(civ, p: Vector2) -> void:
+	for m in _near_fast(civ.pos, CROWD_CUE_R):
+		if not m.judges or not m.alive() or m.alert >= Op.YELLOW:
+			continue
+		if not geom.sight_clear(m.pos, m.eye(), civ.pos, 1.3):
+			continue
+		raise_alert(m, Op.YELLOW)
+		m.hot = true
+		m.dormant = false
+		m.hot_next = t + 0.5
+		m.look_hint = {"dir": (p - m.pos).angle(), "start": t + 0.3, "until": t + 2.5, "why": "crowd"}
+		say("%s sees the crowd react and looks" % m.id, "info")
+
+
 ## ED07 turns the eyes to any sound within 0.3 s; without it, only gunfire, after 1 s.
 func _look_to_sound(o, p: Vector2, gun: bool) -> void:
 	if o.ticker.get("sweep_until", -1.0) > t:
@@ -2921,6 +2978,8 @@ func _hit(a, zn: Array, lat: float, u: Vector2, shooter, energy := 1.0, walls :=
 	if a.alive() and a.civ:
 		stat["civ"] = stat.get("civ", 0) + 1
 		say("%s (civilian) hit by %s%s" % [a.id, shooter.id, " through %d wall%s" % [walls, "" if walls == 1 else "s"] if walls > 0 else ""], "bad")
+	if a.civ and not a.attacker and shooter.judges:
+		_check_fire(shooter)
 	if not a.alive():
 		emit({"type": "blood", "p": a.pos, "dir": u, "power": 0.5, "zone": "body", "id": a.id, "side": side})
 		return

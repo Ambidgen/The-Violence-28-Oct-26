@@ -1717,6 +1717,14 @@ func _think(o) -> void:
 	# while someone unseen shoots at you is no reason to stand there
 	if features["lizard"] and float(o.aim.get("held_t", -9.0)) > w.t - 0.2 and _lizard_cover(o):
 		return
+	# shooter first (EA_TASKS P1.B): the revealed attacker, once judged, keeps the aim
+	var gunman = _visible_shooter(o)
+	if gunman != null:
+		if o.pos.distance_to(gunman.pos) <= 10.0:
+			_rule1(o, gunman)
+		else:
+			_engage_far(o, gunman)
+		return
 	# P1: Rule 1
 	var close = _close_threat(o)
 	if close != null:
@@ -1799,6 +1807,10 @@ func _think(o) -> void:
 		o.dbg = "staring at body"
 		w.stop(o)
 		o.look_goal = (o.ticker["fixate_p"] - o.pos).angle()
+		return
+	# an attack at a public event: officers on post go to the gunfire (EA_TASKS P1.B)
+	if o.judges and not withdrawing and _to_the_shots(o, tm, el):
+		_finish_look(o)
 		return
 	# P5 react
 	if _react(o, tm):
@@ -2024,6 +2036,8 @@ func _close_threat(o):
 
 
 func _rule1(o, e) -> void:
+	if _relaxed_watch(o, e):
+		return
 	var tm: Dictionary = w.teams[o.team]
 	tm["last_contact"] = w.t
 	o.last_contact_t = w.t
@@ -2481,6 +2495,28 @@ func _jumpy(o) -> bool:
 	return false
 
 
+## Once an attack at a public event has begun, an officer who can see the attacker and
+## has judged him a threat answers him first (EA_TASKS P1.B). Without this, bystanders
+## running past inside 10 m took Rule 1 and the officer's aim away from a gunman he was
+## on target with, and the earliest-recognized face in the crowd took the far engagement:
+## at events police start relaxed and judge the crowd as they go, so the response to the
+## attack came seconds later than before 1.B and the attacker hit more people. Only the
+## revealed attacker counts (a bystander misjudged a threat is still a civilian).
+func _visible_shooter(o):
+	if not o.judges or not w.attack_on:
+		return null
+	var best = null
+	var best_d := INF
+	for e in w.visible_enemies(o):
+		if not e.attacker or e.civ or not e.alive() or e.complying or not w.cleared_to_fire(o, e):
+			continue
+		var d: float = o.pos.distance_to(e.pos)
+		if d < best_d:
+			best_d = d
+			best = e
+	return best
+
+
 # ------------------------------------------------------------------ P4
 func _far_target(o):
 	var alternative = _lane_alternative(o, false)
@@ -2517,7 +2553,22 @@ func _far_target(o):
 	return first
 
 
+## A relaxed officer (GREEN: on post at a public event) watches a bystander he has not
+## judged a threat; he does not point his weapon at him (EA_TASKS P1.B). Judgment runs
+## in perception either way. At the ready, or once a person is judged a threat
+## (cleared_to_fire, including by mistake), Rule 1 and the far engagement are unchanged.
+## Before this a crowd at a quiet rally saw a weapon raised at face after face and ran.
+func _relaxed_watch(o, e) -> bool:
+	if o.judges and o.alert == Op.GREEN and (e.civ or e.complying) and not w.cleared_to_fire(o, e):
+		o.dbg = "watching " + e.id
+		o.look_goal = (e.pos - o.pos).angle()
+		return true
+	return false
+
+
 func _engage_far(o, e) -> void:
+	if _relaxed_watch(o, e):
+		return
 	var tm: Dictionary = w.teams[o.team]
 	tm["last_contact"] = w.t
 	o.last_contact_t = w.t
@@ -2690,6 +2741,49 @@ func _latest_lkp(o):
 		if best == null or l["t"] > best["t"]:
 			best = l
 	return best
+
+
+## Active-shooter response (EA_TASKS P1.B). Once an attack at a public event has begun,
+## an officer on post who cannot see the attacker moves toward where the team last saw
+## him, or failing that toward the last gunfire the team heard, at a run; on sight the
+## engagement rules above take over. Before this, posted officers held their posts for
+## the rest of the event while an attacker out of their sight kept shooting: in the n=60
+## sweep, 1 to 5 attackers in 60 were never stopped and hit up to 13 people each.
+const SHOOTER_LKP_S := 30.0
+const SHOOTER_SOUND_S := 10.0
+func _to_the_shots(o, tm: Dictionary, el: Dictionary) -> bool:
+	if not w.attack_on or el["mode"] != "hold":
+		return false
+	var p = null
+	var best_t := -INF
+	var up := false
+	for eid in tm["lkps"]:
+		var e = w.op_by_id(eid)
+		if e == null or not e.attacker or not e.alive() or e.complying:
+			continue
+		up = true
+		var l: Dictionary = tm["lkps"][eid]
+		if w.t - float(l["t"]) < SHOOTER_LKP_S and float(l["t"]) > best_t:
+			best_t = float(l["t"])
+			p = l["p"]
+	if p == null:
+		var snd: Dictionary = tm.get("sound", {})
+		if snd.is_empty() or not w.GUN_SOUNDS.has(String(snd["kind"])) or w.t - float(snd["t"]) > SHOOTER_SOUND_S:
+			return false
+		if not up:
+			for e in w.ops:
+				if e.attacker and e.alive() and not e.complying:
+					up = true
+					break
+		if not up:
+			return false
+		p = snd["p"]
+	if o.pos.distance_to(p) < 3.0:
+		return false
+	o.dbg = "to the shots"
+	w.move_to(o, p, "run")
+	o.look_goal = (p - o.pos).angle()
+	return true
 
 
 func _team_lkp(tm: Dictionary, within: float, from: Vector2):
@@ -3736,8 +3830,12 @@ func _begin_objective(tm: Dictionary, el: Dictionary) -> void:
 				for m in el["members"]:
 					m.ticker["arrest_tid"] = ob.get("target", "")
 			_set_mode(tm, el, "assault")
-		"contain", "post":
+		"contain":
 			_set_posts(tm, el, ob.get("posts", []))
+		"post":
+			# a post keeps the team's base alert: at the ready (YELLOW) on a raid, relaxed
+			# (GREEN) on post at a public event (Operation.police_alert, EA_TASKS P1.B)
+			_set_posts(tm, el, ob.get("posts", []), int(tm.get("base_alert", Op.YELLOW)))
 		"patrol":
 			el["patrol"] = ob.get("route", [])
 			_set_mode(tm, el, "hunt")

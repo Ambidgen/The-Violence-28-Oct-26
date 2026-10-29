@@ -127,6 +127,28 @@ func _init() -> void:
 	check(cash == poor.dept.balance, "the ledger accounts for every dollar of the settlement ($%d walked, $%d in the account)" % [cash, int(poor.dept.balance)])
 	check(low >= 0, "and it settles the week without an overdraft (lowest $%d; contracts %s)" % [low, str(poor.run.contracts)])
 
+	# ---- the roster levers (EA_TASKS P1.C3, P1.C4): used the way the Roster offers them
+	for pol6 in Policies.all():
+		var rc = Campaign.new()
+		rc.start(1001, true, LEGACY)
+		rc.dept.balance = 200000
+		var keep_rule: int = int(Policies.POLICIES[pol6]["hire"].get("keep_on_books", 0))
+		var below: int = int(Policies.POLICIES[pol6]["hire"].get("emergency_below", 0))
+		# a department down to 8 fit: the rest injured
+		var k := 0
+		for r in rc.dept.officers:
+			if String(r["status"]) == "active":
+				k += 1
+				if k > 8:
+					r["status"] = "injured"
+					r["out_until"] = rc.dept.week + 3
+		var fit0: int = rc.dept.available().size()
+		var hl: Array = Policies.hiring(rc, pol6)
+		var signed: bool = hl.any(func(l): return String(l).contains("emergency lateral"))
+		var hired_on: bool = bool(Policies.POLICIES[pol6]["hire"]["on"])
+		check(signed == (hired_on and below > fit0), "%s: %s the emergency lateral at %d fit" % [pol6, "signs" if signed else "does not sign", fit0])
+		check(int(rc.dept.keep_on_books) == (keep_rule if hired_on else 0), "%s: standing order %d" % [pol6, int(rc.dept.keep_on_books)])
+
 	# ---- the bands file: well formed, every metric known, still report-only
 	var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://tests/balance_bands.json"))
 	check(parsed is Dictionary, "balance_bands.json parses")
