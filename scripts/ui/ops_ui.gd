@@ -1912,11 +1912,12 @@ func _briefing(s: Dictionary) -> void:
 		_text(
 			box,
 			(
-				"The standing detail is ten officers; six may be enough on a lowered estimate. Suggest a plan assigns %d from the current reading (%s, %d%% confidence). Posts and patrols cost half overtime. The event lasts fifteen minutes; the estimate is not a guarantee."
+				"The standing detail is ten officers; six may be enough on a lowered estimate. Suggest a plan assigns %d from the current reading (%s, %d%% confidence). Posts and patrols cost half overtime. The event lasts fifteen minutes; the estimate is not a guarantee. Suggest a plan puts officers with trauma under %d on crowd duty first: a shaken officer carries more stress into every shift and misreads a running crowd sooner once something happens."
 				% [
 					Autoplan.want_for(s),
 					String(ch.get("level", "no word")),
-					int(ch.get("conf", 30))
+					int(ch.get("conf", 30)),
+					int(Autoplan.CROWD_TRAUMA)
 				]
 			),
 			GREY,
@@ -2123,7 +2124,7 @@ func _force(s: Dictionary) -> void:
 		l.mouse_filter = Control.MOUSE_FILTER_PASS
 		l.tooltip_text = UI.officer_file(r)
 		if s["type"] == "event" and float(r.get("trauma", 0.0)) >= Autoplan.CROWD_TRAUMA:
-			_text(box, "      trauma %.0f: too shaken for crowd duty (misjudges the crowd under stress)" % float(r["trauma"]), Ink.accent(0.9), 10)
+			_text(box, "      trauma %.0f: Suggest a plan keeps this officer off crowd duty while others are free (carries stress into the shift)" % float(r["trauma"]), Ink.accent(0.9), 10)
 
 
 ## One officer's kit: weapons, sight, armour and gear, within their training.

@@ -114,7 +114,7 @@ politics_test.gd|quick|600|exit|
 rogue_test.gd|quick|600|exit|
 policies_test.gd|quick|300|exit|
 rogue_balance_test.gd|quick|1200|exit|-- --smoke
-ui_walk.gd|quick|900|exit|
+ui_walk.gd|quick|900|exit|--verbose
 determinism_test.gd|full|1800|xfail|-- --verbose
 habits_test.gd|full|1200|exit|-- --strict
 brains_test.gd|full|1200|exit|-- --n=8
@@ -260,7 +260,8 @@ run_one() {
 	# cannot be fetched.
 	if [ "${GITHUB_ACTIONS:-}" = "true" ] && { [ "$status" = "FAIL" ] || [ "$status" = "TIMEOUT" ] || [ "$status" = "XPASS" ]; }; then
 		local detail
-		detail=$(grep -E '\bFAILED\b|\bFAIL\b|HUNG|failures?: *[1-9]|problems?: *[1-9]|stalls: *[1-9]|missing: \[.|SCRIPT ERROR|Parse Error|^ERROR:' "$log" | head -8)
+		# (with --verbose, Godot names each resource still in use at exit: EA_TASKS B4)
+		detail=$(grep -E '\bFAILED\b|\bFAIL\b|HUNG|failures?: *[1-9]|problems?: *[1-9]|stalls: *[1-9]|missing: \[.|SCRIPT ERROR|Parse Error|^ERROR:|still in use|Leaked instance' "$log" | head -12)
 		[ -z "$detail" ] && detail=$(tail -n 8 "$log")
 		[ "$status" = "TIMEOUT" ] && detail="timed out after ${seconds}s"$'\n'"$(tail -n 5 "$log")"
 		detail="${detail//'%'/'%25'}"; detail="${detail//$'\r'/}"; detail="${detail//$'\n'/'%0A'}"

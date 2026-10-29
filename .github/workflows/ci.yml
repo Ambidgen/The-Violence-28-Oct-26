@@ -32,6 +32,10 @@ on:
         description: "Balance matrix: how many seeds (each plays 4 policies, 40 weeks)"
         type: string
         default: "20"
+      results:
+        description: "Balance matrix: folder the report is committed to (default tests/results/cycle-1A/baseline)"
+        type: string
+        default: ""
   schedule:
     # The balance matrix weekly, so a drift in the run layer is noticed without a
     # release. Monday 04:00 UTC. Results are the artifact of the `balance` job.
@@ -277,9 +281,15 @@ jobs:
           (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'balance') ||
           (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/')))
         env:
-          DEST: ${{ github.event_name == 'workflow_dispatch' && 'tests/results/cycle-1A/baseline' || 'tests/results/cycle-1A/pilot' }}
+          # a later cycle measures itself against the baseline in its own folder (1.B)
+          DEST: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.results || 'tests/results/cycle-1A/baseline') || 'tests/results/cycle-1A/pilot' }}
         run: |
           set -euo pipefail
+          case "$DEST" in
+            tests/results/*) ;;
+            *) echo "::error::results must be a folder under tests/results/ (got $DEST)"; exit 1 ;;
+          esac
+          case "$DEST" in *..*) echo "::error::results may not contain .."; exit 1 ;; esac
           mkdir -p "$DEST"
           cp build/balance/report.md "$DEST/report.md"
           cp build/balance/summary.json "$DEST/summary.json"
