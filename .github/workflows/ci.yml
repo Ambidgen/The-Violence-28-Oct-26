@@ -137,6 +137,10 @@ jobs:
       (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    # The evidence has to live in the repository: the artifact is only downloadable
+    # from the run page, and this project's record of a cycle is tests/results/.
+    permissions:
+      contents: write
     env:
       SEEDS: ${{ github.event.inputs.seeds || (github.event_name == 'push' && '2' || '20') }}
     steps:
@@ -175,6 +179,30 @@ jobs:
           # The per-run user:// folders are scratch, not evidence.
           # (report.md, summary.json and run-*.json are what matter.)
           if-no-files-found: warn
+      - name: keep the report in the repository
+        # The artifact dies with the run; the cycle evidence does not. A dispatched
+        # matrix is the baseline (P1.A4), an arena/* push is the pilot -- and the
+        # commit is tagged [skip ci] so that the evidence does not start another
+        # forty-minute matrix.
+        if: >-
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'balance') ||
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
+        env:
+          DEST: ${{ github.event_name == 'workflow_dispatch' && 'tests/results/cycle-1A/baseline' || 'tests/results/cycle-1A/pilot' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$DEST"
+          cp build/balance/report.md "$DEST/report.md"
+          cp build/balance/summary.json "$DEST/summary.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DEST"
+          if git diff --cached --quiet; then
+            echo "the matrix has not changed since the last commit"
+            exit 0
+          fi
+          git commit -m "balance: $DEST [skip ci]"
+          git push origin "HEAD:${{ github.ref_name }}"
 
   full:
     # The simulation and campaign suites, on main and on demand only: they run
