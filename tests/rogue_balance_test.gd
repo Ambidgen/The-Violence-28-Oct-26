@@ -99,6 +99,7 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 	var tot_score := 0
 	var tot_findings := 0
 	var desk_lines: Array = []
+	var op_log: Array = []      # one row per operation (EA_TASKS P1.C1)
 	while not c.over() and c.dept.week <= weeks_wanted:
 		var op_lines: Array = []   # ally lines from this week's operations (before end_week)
 		var wk: int = int(c.dept.week)
@@ -150,6 +151,7 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 				if _ally_line(ln2):
 					op_lines.append(String(ln2))
 			c.record(s["id"], res)
+			op_log.append(_op_row(wk, s, lv, w, res, summary))
 			w.dispose()
 		# 4. the week closes: payroll, allocation, consequences, the next board
 		var end_lines: Array = c.end_week()
@@ -183,7 +185,7 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 		"officers_down_per_op": snappedf(float(tot_down) / maxf(1.0, float(ops_ran)), 0.01),
 		"mean_op_score": tot_score / maxi(1, ops_ran),
 		"record": c.politics.record.duplicate(), "election": {}, "run_score": {},
-		"desk": desk_lines.size(), "weeks": weeks,
+		"desk": desk_lines.size(), "weeks": weeks, "op_log": op_log,
 	}
 	if c.over():
 		var e: Dictionary = c.politics.result["ending"]
@@ -191,6 +193,57 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 			"votes": c.politics.result["votes"], "head": String(e["head"])}
 		out["run_score"] = Rogue.run_score(c)
 	return out
+
+
+## Every operation of every run, one line each (EA_TASKS P1.C1), small enough to commit
+## with the report: the per-run JSON is only the CI run's artifact. (Numbers read back
+## from JSON are floats; whole ones are written as integers.)
+const OPS_COLS := ["seed", "policy", "week", "type", "map", "map_name", "officers", "down", "killed",
+	"killed_by_suspect", "killed_by_friendly", "bled_out", "suspects", "suspects_killed", "civ_killed",
+	"kind", "score", "sim_s", "ended"]
+
+
+func _ops_csv(runs: Array) -> String:
+	var out: PackedStringArray = [",".join(OPS_COLS)]
+	var sorted_runs := runs.duplicate()
+	sorted_runs.sort_custom(func(a, b): return [int(a["seed"]), String(a["policy"])] < [int(b["seed"]), String(b["policy"])])
+	for r in sorted_runs:
+		for o in r.get("op_log", []):
+			var kb: Dictionary = o["killed_by"]
+			var row := [int(r["seed"]), String(r["policy"]), o["week"], o["type"], o["map"],
+				"\"%s\"" % String(o["map_name"]).replace("\"", "'"), o["officers"], o["down"], o["killed"],
+				kb["suspect"], kb["friendly"], kb["bled_out"], o["suspects"], o["suspects_killed"], o["civ_killed"],
+				o["kind"], o["score"], o["sim_s"], 1 if o["ended"] else 0]
+			out.append(",".join(row.map(func(x): return str(int(x)) if (x is float and x == floorf(x)) else str(x))))
+	return "\n".join(out) + "\n"
+
+
+## One operation for the roster-bleed measurement (EA_TASKS P1.C1): what it was, where,
+## how many went, who went down and how (killed by a suspect, by a colleague, or bled out
+## with nobody named), and how it ended.
+func _op_row(wk: int, s: Dictionary, lv, w, res: Dictionary, summary: Dictionary) -> Dictionary:
+	var by_cause := {"suspect": 0, "friendly": 0, "bled_out": 0}
+	var down_cause := {"suspect": 0, "friendly": 0, "other": 0}
+	var police := {}
+	for o in w.ops:
+		if o.judges:
+			police[o.id] = true
+	for f in w.incident.findings:
+		var kind := String(f["kind"])
+		if kind != "officer_killed" and kind != "officer_down":
+			continue
+		var by := String(f["by"])
+		var cause := "bled_out" if by == "" else ("friendly" if police.has(by) else "suspect")
+		if kind == "officer_killed":
+			by_cause[cause] += 1
+		else:
+			down_cause["other" if cause == "bled_out" else cause] += 1
+	return {"week": wk, "type": String(s["type"]), "map": int(s["map"]), "map_name": String(lv.map_name),
+		"officers": int(summary["officers"]), "down": int(summary["officers_down"]),
+		"killed": int(summary["officers_killed"]), "killed_by": by_cause, "down_by": down_cause,
+		"suspects": int(summary["suspects"]), "suspects_killed": int(summary["suspects_killed"]),
+		"civ_killed": int(summary["civ_killed"]), "kind": String(res.get("kind", "")),
+		"score": int(res.get("score", 0)), "sim_s": snappedf(float(w.t), 0.1), "ended": bool(w.over)}
 
 
 func _child(args: Dictionary) -> int:
@@ -353,6 +406,7 @@ func _finish(runs: Array, broken: Array, policy_list: Array, weeks: int, n_seeds
 		"misses": misses, "broken": broken,
 		"derived": by_policy,
 	})
+	_write_text("%s/ops.csv" % out_dir, _ops_csv(runs))
 	print(report)
 	print("rogue_balance: %d run(s) in %d s, %d broken, %d band miss(es) -> %s" % [
 		runs.size(), int(wall / 1000), broken.size(), misses, out_dir])

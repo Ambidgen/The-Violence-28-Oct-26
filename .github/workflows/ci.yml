@@ -293,6 +293,8 @@ jobs:
           mkdir -p "$DEST"
           cp build/balance/report.md "$DEST/report.md"
           cp build/balance/summary.json "$DEST/summary.json"
+          # every operation, one line each (EA_TASKS P1.C1); absent from runs before 1.C
+          if [ -f build/balance/ops.csv ]; then cp build/balance/ops.csv "$DEST/ops.csv"; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$DEST"
