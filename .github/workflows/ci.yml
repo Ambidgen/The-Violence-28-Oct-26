@@ -201,9 +201,36 @@ jobs:
         # does that itself). Its exit code is only "these runs finished"; the merge
         # job judges the whole matrix.
         run: |
+          mkdir -p build/balance
           ~/godot/godot --headless --path . -s res://tests/rogue_balance_test.gd -- \
             --seeds=${{ matrix.shard.n }} --first=${{ matrix.shard.first }} \
-            --policy=all --weeks=40 --jobs=4 --json=build/balance
+            --policy=all --weeks=40 --jobs=4 --json=build/balance 2>&1 | tee build/balance/shard.log
+      - name: what the shard left
+        # The job log and the artifacts are not reachable from every place this project
+        # is worked on; annotations are. A shard that wrote no summary, runs that wrote
+        # no JSON and engine errors in any run's own log become annotations (1.C: a 1.B
+        # matrix lost 53 of 80 runs and said nothing).
+        if: always()
+        run: |
+          cd build/balance
+          n=$(ls run-*.json 2>/dev/null | wc -l)
+          echo "::notice title=shard ${{ matrix.shard.first }}::$n run JSON file(s); summary.json $( [ -f summary.json ] && echo present || echo MISSING )"
+          if [ ! -f summary.json ]; then
+            tail="$(tail -n 15 shard.log 2>/dev/null | tr -d '\r')"
+            tail="${tail//'%'/'%25'}"; tail="${tail//$'\n'/'%0A'}"
+            echo "::error title=shard ${{ matrix.shard.first }} wrote no summary::$tail"
+          fi
+          for lg in user/*/TheViolence/logs/godot.log; do
+            [ -f "$lg" ] || continue
+            run=$(echo "$lg" | cut -d/ -f2)
+            errs="$(grep -E 'SCRIPT ERROR|^ERROR|crash|Segmentation|signal' "$lg" | head -6 | tr -d '\r')"
+            if [ -n "$errs" ] || [ ! -f "run-${run}.json" ]; then
+              last="$(tail -n 6 "$lg" | tr -d '\r')"
+              msg="${errs:-no engine error}%0A--- last lines ---%0A${last}"
+              msg="${msg//$'\n'/'%0A'}"
+              echo "::error title=run $run ($( [ -f "run-${run}.json" ] && echo 'JSON written' || echo 'NO JSON' ))::$msg"
+            fi
+          done
       - name: upload the shard
         if: always()
         uses: actions/upload-artifact@v4
@@ -215,6 +242,8 @@ jobs:
             build/balance/run-*.json
             build/balance/summary.json
             build/balance/report.md
+            build/balance/shard.log
+            build/balance/user/*/TheViolence/logs/godot.log
           if-no-files-found: warn
 
   balance-merge:
