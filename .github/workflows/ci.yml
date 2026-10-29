@@ -16,15 +16,26 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    # main is the release gate. arena/* is the working branch: its push run is what
+    # gives the balance job its two-seed pilot (the pull_request run cannot -- see the
+    # job's `if`, which needs a push event to tell a pilot from a pull request).
+    branches: [main, "arena/**"]
   pull_request:
   workflow_dispatch:
     inputs:
       tier:
-        description: "Test tier to run"
+        description: "Test tier to run (balance = the Gate 1 matrix, EA_TASKS P1.A)"
         type: choice
         default: quick
-        options: [check, quick, full]
+        options: [check, quick, full, balance]
+      seeds:
+        description: "Balance matrix: how many seeds (each plays 4 policies, 40 weeks)"
+        type: string
+        default: "20"
+  schedule:
+    # The balance matrix weekly, so a drift in the run layer is noticed without a
+    # release. Monday 04:00 UTC. Results are the artifact of the `balance` job.
+    - cron: "0 4 * * 1"
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -110,6 +121,95 @@ jobs:
           name: test-logs-${{ matrix.engine }}
           path: build/test-logs/
           if-no-files-found: ignore
+
+  balance:
+    # The Gate 1 matrix (EA_TASKS P1.A2/P1.A4): every policy plays whole campaigns,
+    # one process per run, and the summary + per-run JSON come back as an artifact.
+    # Not part of the commit gate: it is tens of minutes to hours. It runs
+    #   - on demand (Actions -> ci -> Run workflow, tier=balance, seeds=N),
+    #   - weekly (schedule), and
+    #   - on a push to an arena/* branch, as a two-seed pilot: enough to prove the
+    #     harness end to end and to see the shape of the run layer on a real engine.
+    name: balance matrix
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'balance') ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
+    runs-on: ubuntu-latest
+    # Measured: one 40-week run is 21-34 minutes of wall clock depending on how loaded
+    # the runner is; four at a time is 37-68 minutes per two seeds (four 1.A pilots:
+    # 8 runs each, 2246-4069 s, identical tables). Twenty seeds is therefore 7-11 h,
+    # which is why 300 minutes was not enough, why the limit is 18 h, and why the
+    # weekly drift check runs fewer seeds than the baseline.
+    timeout-minutes: 1080
+    # The evidence has to live in the repository: the artifact is only downloadable
+    # from the run page, and this project's record of a cycle is tests/results/.
+    permissions:
+      contents: write
+    env:
+      # A push is the two-seed pilot, the weekly schedule is a drift check (8), and
+      # anything else -- a dispatch without a seed count -- is the full baseline.
+      SEEDS: ${{ github.event.inputs.seeds || (github.event_name == 'push' && '2' || (github.event_name == 'schedule' && '8' || '20')) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: cache the engine
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-4.7.2-stable
+      - name: install Godot 4.7.2-stable
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q -o /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v4.7.2-stable_linux.x86_64 ~/godot/godot
+          chmod +x ~/godot/godot
+      - name: import the project
+        run: ~/godot/godot --headless --path . --import || true
+      - name: balance matrix
+        # One process per seed x policy, each with its own XDG_DATA_HOME (the harness
+        # does that itself). Report-only bands until P1.I, so this job's colour is
+        # "the runs finished", not "the game is balanced" — read report.md.
+        run: |
+          ~/godot/godot --headless --path . -s res://tests/rogue_balance_test.gd -- \
+            --seeds="$SEEDS" --policy=all --weeks=40 --jobs=4 --json=build/balance
+      - name: upload the matrix
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-${{ github.run_id }}
+          path: build/balance/
+          # The per-run user:// folders are scratch, not evidence.
+          # (report.md, summary.json and run-*.json are what matter.)
+          if-no-files-found: warn
+      - name: keep the report in the repository
+        # The artifact dies with the run; the cycle evidence does not. A dispatched
+        # matrix is the baseline (P1.A4), an arena/* push is the pilot -- and the
+        # commit is tagged [skip ci] so that the evidence does not start another
+        # forty-minute matrix.
+        if: >-
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'balance') ||
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
+        env:
+          DEST: ${{ github.event_name == 'workflow_dispatch' && 'tests/results/cycle-1A/baseline' || 'tests/results/cycle-1A/pilot' }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$DEST"
+          cp build/balance/report.md "$DEST/report.md"
+          cp build/balance/summary.json "$DEST/summary.json"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$DEST"
+          if git diff --cached --quiet; then
+            echo "the matrix has not changed since the last commit"
+            exit 0
+          fi
+          git commit -m "balance: $DEST [skip ci]"
+          git push origin "HEAD:${{ github.ref_name }}"
 
   full:
     # The simulation and campaign suites, on main and on demand only: they run

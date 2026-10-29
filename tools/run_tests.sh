@@ -32,7 +32,12 @@
 #   2. It still fails a suite whose log shows a GDScript or engine error (SCRIPT
 #      ERROR, Parse Error, ERROR:), because Godot keeps running a script after a
 #      runtime error and can still quit(0). This applies to every suite.
-#   3. A suite marked xfail is a KNOWN failure with a stated reason: it runs and is
+#   3. rogue_balance_test runs twice in a life: --smoke in this tier (1 seed x 4
+#      policies x 2 weeks, a shakedown of the policy harness and its child processes),
+#      and the full Gate 1 matrix by hand or in the balance job of CI (EA_TASKS P1.A2:
+#      `tests/rogue_balance_test.gd -- --seeds=20 --policy=all`). The smoke does not
+#      assert balance: tests/balance_bands.json is report-only until P1.I.
+#   4. A suite marked xfail is a KNOWN failure with a stated reason: it runs and is
 #      reported, but does not fail the tier. If it starts passing it is reported as
 #      XPASS and *does* fail the tier, so the mark cannot outlive the reason. A
 #      failure only counts as KNOWN if the log shows the known signature
@@ -107,6 +112,8 @@ save_test.gd|quick|600|exit|
 story_test.gd|quick|300|exit|
 politics_test.gd|quick|600|exit|
 rogue_test.gd|quick|600|exit|
+policies_test.gd|quick|300|exit|
+rogue_balance_test.gd|quick|1200|exit|-- --smoke
 ui_walk.gd|quick|900|exit|
 determinism_test.gd|full|1800|xfail|-- --verbose
 habits_test.gd|full|1200|exit|-- --strict
