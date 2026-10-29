@@ -89,7 +89,8 @@ func _process(delta: float) -> bool:
 			quit(1)
 			return true
 		if every > 0 and frame_count % every == 0:
-			img.save_jpg("%s/frame_%04d.jpg" % [out_dir, frame_count / every], 0.9)
+			saved_frames += 1
+			img.save_jpg("%s/frame_%04d.jpg" % [out_dir, saved_frames], 0.9)
 		while not stills.is_empty() and elapsed >= float(stills[0]):
 			var at: float = float(stills.pop_front())
 			var path := "%s/still_%06.2fs.png" % [out_dir, at]
