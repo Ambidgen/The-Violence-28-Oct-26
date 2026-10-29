@@ -326,6 +326,10 @@ const OFFER_P := 0.4
 const EVENT_P := 0.55
 
 var rng := RandomNumberGenerator.new()
+## The replacement stream (EA_TASKS P0.C2). Re-dealing a draft card after a stocking
+## change draws from here and never from `rng`, so the rest of the desk — offers,
+## events, future drafts — stays exactly where the seed put it. Saved with the run.
+var draft_rng := RandomNumberGenerator.new()
 var armory: Array = []        # stocked item ids
 var contracts: Array = []     # signed contract ids, in order
 var programs_done: Array = [] # finished program ids
@@ -342,8 +346,16 @@ var doctrine := ""
 var unlocked: Array = []      # doctrine ids this run could draw from
 
 
-func start(seed_v: int, legacy: Dictionary = {}) -> void:
+## Two independent streams from one seed: the desk's (rng) and the replacement
+## stream's (draft_rng). Multiplication constants are distinct so the two sequences
+## never coincide.
+func _seed_streams(seed_v: int) -> void:
 	rng.seed = seed_v * 6151 + 29
+	draft_rng.seed = seed_v * 9241 + 137
+
+
+func start(seed_v: int, legacy: Dictionary = {}) -> void:
+	_seed_streams(seed_v)
 	armory = BASE_STOCK.duplicate()
 	contracts = []
 	programs_done = []
@@ -380,6 +392,21 @@ func contract_tier_ok(cid: String, week: int) -> bool:
 	return t == 1 or (t == 2 and week >= 5) or (t == 3 and week >= 13)
 
 
+## Every item the contract carries is already in the armoury, so signing it would
+## charge the department and add nothing (EA_TASKS P0.C3). A contract with *some* new
+## items is still worth buying: breaching rounds arrive with a shotgun the armoury may
+## already hold.
+func contract_stocked(cid: String) -> bool:
+	if not CONTRACTS.has(cid):
+		return false
+	for it in CONTRACTS[cid]["items"]:
+		if not armory.has(it):
+			return false
+	return true
+
+
+## Contracts still worth offering: not signed, allowed at this week, carrying at least
+## one item the armoury lacks (P0.C1).
 func _open_contracts(week: int, tag := "") -> Array:
 	var out: Array = []
 	for cid in CONTRACTS:
@@ -387,13 +414,53 @@ func _open_contracts(week: int, tag := "") -> Array:
 			continue
 		if tag != "" and CONTRACTS[cid]["tag"] != tag:
 			continue
-		var all_in := true
-		for it in CONTRACTS[cid]["items"]:
-			if not armory.has(it):
-				all_in = false
-		if not all_in:
-			out.append(cid)
+		if contract_stocked(cid):
+			continue
+		out.append(cid)
 	return out
+
+
+## A draft is dealt before the chief picks an inheritance or takes an offer, so a
+## stocking change can make one of its cards redundant. Replace it from the same tier
+## on the replacement stream, or drop the card if nothing is left to offer; drop the
+## whole draft when it has no cards. Nothing is charged, nothing is refunded, and the
+## main rng does not move, so a seed still deals the same desk either way (P0.C2).
+func _revalidate_drafts() -> Array:
+	var lines: Array = []
+	var di := drafts.size() - 1
+	while di >= 0:
+		var d: Dictionary = drafts[di]
+		if String(d.get("kind", "")) != "procurement":
+			di -= 1
+			continue
+		var week: int = int(d.get("week", 1))
+		var cards_v = d.get("cards", null)
+		if not (cards_v is Array):
+			di -= 1
+			continue
+		var cards: Array = cards_v
+		var i := cards.size() - 1
+		while i >= 0:
+			var cid := String(cards[i])
+			if CONTRACTS.has(cid) and (contracts.has(cid) or contract_stocked(cid)):
+				var tier: int = int(CONTRACTS[cid]["tier"])
+				var pool: Array = _open_contracts(week).filter(
+					func(x): return int(CONTRACTS[x]["tier"]) == tier and not cards.has(x))
+				var ln := ""
+				if pool.is_empty():
+					cards.remove_at(i)
+					ln = "%s is already in the armoury; that card is gone from the draft." % CONTRACTS[cid]["name"]
+				else:
+					var alt: String = String(pool[draft_rng.randi() % pool.size()])
+					cards[i] = alt
+					ln = "%s is already in the armoury; the draft offers %s instead." % [CONTRACTS[cid]["name"], CONTRACTS[alt]["name"]]
+				lines.append(ln)
+				_log(week, "Procurement re-dealt: %s" % ln)
+			i -= 1
+		if cards.is_empty():
+			drafts.remove_at(di)
+		di -= 1
+	return lines
 
 
 # ================================================================== the week
@@ -604,6 +671,9 @@ func pick(c, di: int, cid: String) -> Array:
 				_log(week, "Passed on procurement.")
 			else:
 				var ct: Dictionary = CONTRACTS[cid]
+				if contract_stocked(cid):
+					_log(week, "Declined a redundant contract: %s (already stocked)." % ct["name"])
+					return ["%s is already in the armoury. No contract is needed, and nothing is charged." % ct["name"]]
 				if c.dept.balance < int(ct["cost"]):
 					return ["The account cannot cover the %s contract ($%s)." % [ct["name"].to_lower(), c.dept.money(int(ct["cost"]))]]
 				c.dept.spend("Contract: %s" % ct["name"], int(ct["cost"]))
@@ -622,6 +692,9 @@ func pick(c, di: int, cid: String) -> Array:
 				_log(week, "Started %s." % info["name"])
 				_tag(c, String(info.get("tag", "")), lines)
 	drafts.remove_at(di)
+	# The pick may have stocked the armoury (a plate-carrier inheritance, a signed
+	# contract): any card it made redundant is re-dealt now, after this draft is gone.
+	lines.append_array(_revalidate_drafts())
 	c.dept.note("Desk: %s" % " ".join(lines))
 	return lines
 
@@ -951,6 +1024,8 @@ func apply(c, eff: Dictionary, ctx: Dictionary) -> Array:
 			cid = String(mil[rng.randi() % mil.size()]) if not mil.is_empty() else ""
 		if cid != "" and CONTRACTS.has(cid) and not contracts.has(cid):
 			lines.append_array(_sign(c, cid, false))
+		# A free contract mid-week stocks the armoury the same way a signed one does.
+		lines.append_array(_revalidate_drafts())
 	intel_weeks += int(eff.get("intel_weeks", 0))
 	quiet_weeks += int(eff.get("quiet_weeks", 0))
 	if int(eff.get("delay_stories", 0)) > 0:
@@ -1132,7 +1207,8 @@ func record_run(c, path := LEGACY_PATH) -> Array:
 
 # ================================================================== saving
 func to_data() -> Dictionary:
-	return {"version": VERSION, "rng_state": str(rng.state), "armory": armory.duplicate(), "contracts": contracts.duplicate(),
+	return {"version": VERSION, "rng_state": str(rng.state), "draft_rng_state": str(draft_rng.state),
+		"armory": armory.duplicate(), "contracts": contracts.duplicate(),
 		"programs_done": programs_done.duplicate(), "program": program.duplicate(true), "drafts": drafts.duplicate(true),
 		"offers": offers.duplicate(true), "events": events.duplicate(true), "later": later.duplicate(true),
 		"intel_weeks": intel_weeks, "quiet_weeks": quiet_weeks, "log": desk_log.duplicate(true), "seen": seen.duplicate(true),
@@ -1140,8 +1216,12 @@ func to_data() -> Dictionary:
 
 
 func from_data(d: Dictionary, seed_v: int) -> void:
-	rng.seed = seed_v * 6151 + 29
+	_seed_streams(seed_v)
 	rng.state = String(d.get("rng_state", "0")).to_int()
+	# A save written before P0.C2 has no replacement state: the stream restarts from
+	# its seed, which only affects which alternative card a stale draft is re-dealt.
+	if d.has("draft_rng_state"):
+		draft_rng.state = String(d["draft_rng_state"]).to_int()
 	armory = _arr(d, "armory", BASE_STOCK)
 	contracts = _arr(d, "contracts", [])
 	programs_done = _arr(d, "programs_done", [])
@@ -1161,6 +1241,9 @@ func from_data(d: Dictionary, seed_v: int) -> void:
 	doctrine = String(d.get("doctrine", ""))
 	unlocked = _arr(d, "unlocked", DOCTRINE_ORDER.slice(0, DOCTRINE_BASE))
 	Equipment.armory = armory_set()
+	# A draft saved before the fix may still hold a card the armoury already covers
+	# (a run saved between picking the inheritance and signing a contract).
+	_revalidate_drafts()
 
 
 static func _arr(d: Dictionary, k: String, dflt: Array) -> Array:

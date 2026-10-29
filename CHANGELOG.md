@@ -2,6 +2,81 @@
 
 Newest first. The README covers the game as it stands; this file keeps the history.
 
+## Unreleased — EA_TASKS cycle 0.D: version, licence, hygiene (2026-10-28)
+
+Gate 0 closed. The three things it was waiting on, decided and implemented.
+
+- **The version line is 1.3.x = Early Access, 2.0 = the 1.0 release** (P0.D1). `Version.VALUE`
+  is **1.3.0** and a new `Version.CHANNEL` says "Early Access"; `tools/sync_version.py`
+  wrote 1.3.0 / Windows 1.3.0.0 into `project.godot` and `export_presets.cfg`. The title
+  plate now carries a red **EARLY ACCESS** stamp with `V1.3.0` beside it, drawn from
+  `Version.CHANNEL` rather than a literal, so the label moves with the version. The Windows
+  resource fallback in `tools/patch_rc.py` is gone: a build that cannot read
+  `scripts/version.gd` stops instead of shipping an exe stamped with a stale number.
+- **`LICENSE`: proprietary, all rights reserved** (P0.D2). Reading, forking for review and
+  quoting in reviews, criticism and reporting are allowed; redistribution, commercial use,
+  derivative works and reuse of the art, audio, text or city data are not. Contributions
+  sent as pull requests are licensed to the project.
+- **`THIRD_PARTY_NOTICES`** (P0.D2): the Godot Engine MIT text, the Patrick Hand OFL 1.1
+  pointer and text file, Remotion and its render-time fonts (Courier Prime, Oswald, Open
+  Sans — OFL) and React (MIT), and the Python asset tools (numpy/scipy BSD, Pillow
+  MIT-CMU). Both files are added to `include_filter` in **every** export preset, so a
+  shipped build carries them, and the credits screen now names the channel and the
+  development state, the cutscene tooling, the licence line and the notices.
+- **Remotion: the free licence applies** (P0.D3). It is free for an individual, a team of
+  up to three people, or a non-profit; the project qualifies, so no company licence is
+  required and the openers and shorts are **not** re-rendered (P4.C1 keeps them as they
+  are). The decision and the version (4.0.537) are recorded in the notices, together with
+  the trigger for revisiting it: more than three people on the project, a publisher, or a
+  company formed around it.
+- **The user directory is fixed** (P0.D4): `application/config/use_custom_user_dir=true`
+  with `custom_user_dir_name="TheViolence"`, decided before any cloud-save path exists, so
+  renaming the game can never move a save. `Settings.migrate()` now carries files from
+  both folders earlier builds wrote (`The Violence - Vertical Slice`, then `The Violence`)
+  into the fixed one, never over an existing file, and now carries `legacy.json` too — the
+  unlocked doctrines used to stay behind in the old folder.
+- **The Windows and Linux preset metadata says who made it**: company "Ambidgen",
+  copyright "Copyright (c) 2026 Ambidgen. All rights reserved."
+- **`improvements_test` guards all of it**: the version is on the 1.3 line and `CHANNEL`
+  names it, the title and credits still print the channel, the notices and the licence;
+  `project.godot`'s user-directory key matches `Settings.USER_DIR`; the legacy folders are
+  still listed and `legacy.json` still carried; both licence files exist and **every**
+  export preset ships them.
+- Evidence: `tests/results/cycle-0D/`.
+
+## Unreleased — EA_TASKS cycle 0.C: duplicate procurement charge (2026-10-28)
+
+- **A contract can no longer be signed for kit the armoury already holds** (P0.C1–C3).
+  The 28 Oct playtest reproduced the charge: the week-1 procurement draft is dealt
+  before the inheritance is chosen, so *Plate carriers on day one* plus the plate
+  contract charged **$6,000** and added nothing (`contracts` became
+  `["plates", "plates"]`). Six of twelve seeds dealt it. The deal-time filter that
+  skips a contract whose every item is stocked already existed, but it runs before the
+  stocking that makes the card redundant.
+- **`contract_stocked()`** is the one predicate now: `_open_contracts()` uses it (C1),
+  `pick()` refuses with a line and no charge while leaving the draft open (C3), and
+  `_revalidate_drafts()` uses it.
+- **Drafts are re-validated after every stocking change** (C2): a doctrine pick that
+  stocks the armoury, a signed contract, or a free contract arriving from an offer or
+  event. A redundant card is replaced from the **same tier**; if nothing is left to
+  offer the card is dropped, and a draft with no cards is dropped too. The desk says so
+  in the answer's lines and in the campaign file.
+- **The replacement has its own RNG stream** (`draft_rng`, seeded from the run seed and
+  saved as `draft_rng_state`). The desk's `rng` does not move, so a seed deals the same
+  offers, events and later drafts whether or not a card was re-dealt. A save written
+  before this change restores with the replacement stream restarted from its seed, which
+  only affects which alternative a stale draft receives.
+- **Load repairs old saves**: `from_data()` re-validates the drafts it restores, so a run
+  saved between the inheritance and the contract no longer shows a redundant card.
+- **`rogue_test` covers it** (C4): seeds 1–12 × every inheritance × every contract offered
+  afterwards must produce **0 wasted purchases** and charge exactly the contract's cost;
+  plus the guard, the mid-week free military contract, and an assertion that a re-dealt
+  card consumes only the replacement stream while the desk's rng is untouched. The 28 Oct
+  `dup_probe.gd` is folded in (it lives in `tests/results/playtest-2026-10-28-campaign/`).
+- The board's procurement line reads its card count instead of saying "three contracts",
+  and a card the armoury already covers no longer appears there at all.
+- Evidence: `tests/results/cycle-0C/`.
+
 ## Unreleased — EA_TASKS cycle 0.B: playtest tooling in the tree (2026-10-28)
 
 - **`tools/playtest.sh`: one command for a campaign playtest.** With no arguments it repeats the 28 Oct playtest: three 40-week roguelike runs (seed 1001 `--hire --train`, 2002 minimal, 3003 `--hire`) in parallel, each with its own `user://`, then the rendered walk, then the table. `--weeks=`, `--runs="SEED:opts ..."`, `--no-walk`, `--resolution=WxH`, `--out=`. Writes `campaign-seed<N>.json/.log`, `walk/`, `report.md`, `report.csv`; exits 1 if a run or the walk failed (P0.B).

@@ -18,17 +18,34 @@ static var _loaded := false
 ## 1.0 renamed the project from "The Violence - Vertical Slice", which moves Godot's
 ## user folder; the first launch copies the old saves and settings across.
 const OLD_DIR := "The Violence - Vertical Slice"
-const CARRY := ["campaign.json", "campaign.json.bak", "department.json", "department.json.bak", "settings.cfg"]
+## P0.D4 (2026-10-28): the game now writes to a fixed directory, so renaming it can
+## never move a save again (and the Steam Cloud path, when it exists, is the same one).
+## app_userdata/ holds the folders Godot derived from the project name: "The Violence"
+## for the 1.3 candidate and the old slice name before it. Must match
+## application/config/custom_user_dir_name in project.godot.
+const USER_DIR := "TheViolence"
+const CARRY := ["campaign.json", "campaign.json.bak", "department.json", "department.json.bak",
+	"settings.cfg", "legacy.json"]
 
 
+## Every folder the saves may still be in, oldest name first. The fixed directory is
+## here so an install that already ran is recognised as "here" and skipped.
+static func legacy_dirs() -> Array:
+	var here := ProjectSettings.globalize_path("user://").trim_suffix("/")
+	var appdata := here.get_base_dir()
+	return [appdata.path_join(OLD_DIR), appdata.path_join("The Violence"), here]
+
+
+## Copy the saves and settings into the current user directory (never over an existing
+## file). Safe to call on every launch: with nothing to carry it does nothing.
 static func migrate() -> void:
-	var here := ProjectSettings.globalize_path("user://")
-	var old := here.trim_suffix("/").get_base_dir().path_join(OLD_DIR)
-	if not DirAccess.dir_exists_absolute(old) or old == here.trim_suffix("/"):
-		return
-	for f in CARRY:
-		if FileAccess.file_exists(old.path_join(f)) and not FileAccess.file_exists("user://" + f):
-			DirAccess.copy_absolute(old.path_join(f), here.path_join(f))
+	var here := ProjectSettings.globalize_path("user://").trim_suffix("/")
+	for old in legacy_dirs():
+		if old == here or not DirAccess.dir_exists_absolute(old):
+			continue
+		for f in CARRY:
+			if FileAccess.file_exists(old.path_join(f)) and not FileAccess.file_exists("user://" + f):
+				DirAccess.copy_absolute(old.path_join(f), here.path_join(f))
 
 
 static func load_all() -> void:

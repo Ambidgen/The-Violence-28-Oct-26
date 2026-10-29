@@ -61,6 +61,8 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 - **Debug:** if "same seed deals the same desk" fails, the replacement consumed the main RNG. Move it to its own stream.
 - **Exit:** 0 wasted purchases; reproducibility still passes.
 
+**Status 2026-10-28: done.** The deal-time filter the plan asks for in C1 already existed (`_open_contracts` skipped a contract whose every item was stocked) and could not help: the week-1 procurement draft is dealt in `on_week_start()` **before** the inheritance is chosen, so the stocking that made the card redundant happened afterwards. `contract_stocked()` is now the one predicate, used by the deal, by a new `_revalidate_drafts()` (C2: after a doctrine pick, a signed contract or a free contract from an offer), and by a refusal in `pick()` (C3: a line, no charge, the draft stays open; `from_data()` re-validates restored drafts, so a save written before this change is repaired on load). The replacement draws from its own stream, `draft_rng` (seeded from the run seed, saved as `draft_rng_state`), so the desk's `rng` does not move: same seed, same desk, same later weeks. C4 folds `dup_probe.gd` into `rogue_test`: seeds 1–12 × every inheritance × every contract still offered afterwards must charge exactly the contract's cost and add at least one item; plus the guard, the mid-week free military contract, and an assertion that a re-dealt card advances the replacement stream while the desk's rng stays put. The board's procurement line reads its card count instead of assuming three. Verified: the quick tier (which includes `rogue_test`) is green on **Godot 4.7.2 and 4.4.1** in CI run 40785806997 on PR #1 — any of the new assertions failing would have failed the suite and the job. No engine was available in the sandbox that wrote the change, so the job conclusions, not quoted PASS lines (the CI log blob host is unreachable from it), are the evidence; the static audit (`gd47_check`, 128 files) and `gdparse` on the changed files are clean. Evidence: `tests/results/cycle-0C/`.
+
 ### Cycle 0.D — Version, licence, hygiene
 | ID | Task | Files | Size |
 |---|---|---|---|
@@ -69,7 +71,21 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 | P0.D3 | **Remotion licence:** confirm whether your situation needs a company licence. If it does and you won't buy one, plan to re-render the openers and shorts with other tooling (this links to P4.C). | — | S (decision) |
 | P0.D4 | Set `application/config/use_custom_user_dir` and a fixed user-dir name now, so Steam Cloud paths (P2.C4) never move. Keep `Settings.migrate()` for the old dir. | `project.godot`, `ui/settings.gd` | S |
 
+**Status 2026-10-28: done** (the owner's decisions, taken in this session).
+
+| ID | What was decided and done |
+|---|---|
+| P0.D1 | **Version line: 1.3.x = Early Access, 2.0 = the 1.0 release.** `Version.VALUE` is **1.3.0**, `Version.CHANNEL` is "Early Access"; `tools/sync_version.py` wrote 1.3.0 / 1.3.0.0 into `project.godot` and `export_presets.cfg`. The title plate carries a red **EARLY ACCESS** stamp and `V1.3.0` in its corner, drawn from `Version.CHANNEL`, not from a literal. `tools/patch_rc.py`'s hardcoded `FALLBACK_VERSION` is gone: a Windows build that cannot read `scripts/version.gd` now stops instead of stamping the exe with a number nobody bumped. |
+| P0.D2 | **Licence: proprietary, all rights reserved** (`LICENSE`): reading, forking for review and quoting in reviews are permitted; redistribution, commercial use, derivative works and reuse of the art, audio, text or city data are not. **`THIRD_PARTY_NOTICES`** carries the Godot MIT text, the Patrick Hand OFL pointer and text file, Remotion and the render-time fonts (Courier Prime, Oswald, Open Sans — OFL), React (MIT), and the Python asset tools (numpy/scipy BSD, Pillow MIT-CMU). Both files are in every export preset's `include_filter`, and the credits screen names the licence, the notices and the development state. |
+| P0.D3 | **Remotion: the free licence applies.** Remotion is free for an individual, a team of up to three people, or a non-profit ([licence FAQ](https://www.remotion.dev/docs/license/faq)); this project qualifies, so **no company licence is required and no re-render is needed** — P4.C1 keeps the red-ink openers as they are. The position and the version (4.0.537) are recorded in `THIRD_PARTY_NOTICES`. **Re-check on a change of circumstance**: more than three people on the project, a publisher, or a company formed around it turns this into a $25/seat/month Company Licence. |
+| P0.D4 | **The user directory is fixed now**: `application/config/use_custom_user_dir=true` with `custom_user_dir_name="TheViolence"`, so a rename can never move a save and the Steam Cloud path (P2.C4) is decided before it is needed. `Settings.migrate()` now walks every folder earlier builds wrote — `The Violence - Vertical Slice`, then `The Violence` — and carries `campaign.json(.bak)`, `department.json(.bak)`, `settings.cfg` **and `legacy.json`**, never over an existing file. `improvements_test` pins the project key to `Settings.USER_DIR`, the three legacy folders, and that both files ship. |
+
+- **Verified:** the quick tier is green on **Godot 4.7.2 and 4.4.1** in CI run 40791685096 (`ac2fda7`), after one caught fault: the first run of the cycle (40790768232) failed `improvements_test` with a parse error — `filter()` on the result of `String.split()`, a `PackedStringArray` — which neither `gd47_check` nor `gdparse` can see, because they do not type-check. Fixed by wrapping the value in `Array(...)`.
+- **Evidence:** `tests/results/cycle-0D/`. The static audit and the CI quick tier (both engines) are the checks; `improvements_test` is in that tier and now fails if the version line drifts off 1.3, if the title or credits stop naming the channel, the licence or the notices, if `project.godot`'s user-directory key disagrees with `Settings.USER_DIR`, or if an export preset stops shipping `LICENSE`/`THIRD_PARTY_NOTICES`.
+
 **Gate 0:** `--quick` and CI green with honest exit codes; the duplicate regression passes; the version line and licence are decided.
+
+**Gate 0 on 2026-10-28: met.** 0.A, 0.B, 0.C and 0.D are done: the quick tier is green on Godot 4.7.2 and 4.4.1 with honest exit codes, the duplicate regression passes, and the version line (1.3.0 Early Access) and the licence (proprietary; Remotion free) are decided and recorded. What Gate 0 deliberately does **not** cover is Phase 1's work: the stale determinism fixture (rebaseline at P1.I1) and the three simulation findings B1–B3.
 
 ---
 
@@ -373,8 +389,8 @@ These durations assume full-time work; stretch them proportionally for evenings 
 
 ## Decisions needed before or during the cycles
 
-1. Version line (P0.D1).
-2. Licence for the game and the Remotion question (P0.D2–D3).
+1. Version line (P0.D1). **Decided 2026-10-28: 1.3.x = Early Access, 1.3.0 now; 2.0 = release.**
+2. Licence for the game and the Remotion question (P0.D2–D3). **Decided 2026-10-28: proprietary, all rights reserved; Remotion under its free licence (re-check if headcount passes three or a company is involved).**
 3. Gate 1 thresholds (`balance_bands.json`).
 4. Whether Kettering keeping a brutal chief stays, and how the score treats it (P1.F2).
 5. Cutscenes as-is or re-rendered (P4.C1).

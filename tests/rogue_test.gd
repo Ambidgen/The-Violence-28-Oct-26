@@ -1,11 +1,12 @@
 extends SceneTree
 ## The run layer (1.3): the roguelike story mode, headless.
-##   godot --headless --path . -s res://tests/rogue_test.gd [-- --seeds=6]
+##   godot --headless --path . -s res://tests/rogue_test.gd [-- --seeds=6 --matrix-seeds=12]
 ## Gates: the same seed deals the same desk; a run saves and loads back unchanged; the
-## armoury gates every kit and opens as contracts are signed; a finished program
-## teaches its habit to the whole force and to every hire after; forty weeks of
-## randomly answered desks reach the election with a score and a legacy entry; the
-## classic campaign (the harnesses' campaign) is untouched.
+## armoury gates every kit and opens as contracts are signed; no inheritance or free
+## contract can leave a procurement card that charges for stocked kit (EA_TASKS P0.C);
+## a finished program teaches its habit to the whole force and to every hire after;
+## forty weeks of randomly answered desks reach the election with a score and a legacy
+## entry; the classic campaign (the harnesses' campaign) is untouched.
 
 const Campaign = preload("res://scripts/campaign/campaign.gd")
 const Rogue = preload("res://scripts/campaign/rogue.gd")
@@ -29,6 +30,21 @@ static func _norm(d) -> String:
 func _week_through(c) -> void:
 	c.run.auto_resolve(c)
 	c.end_week()
+
+
+## The cards of the first open draft of this kind, copied.
+func _cards_of(c, kind: String) -> Array:
+	for d in c.run.drafts:
+		if String(d["kind"]) == kind:
+			return (d["cards"] as Array).duplicate()
+	return []
+
+
+func _draft_index(c, kind: String) -> int:
+	for i in c.run.drafts.size():
+		if String(c.run.drafts[i]["kind"]) == kind:
+			return i
+	return -1
 
 
 func _init() -> void:
@@ -84,6 +100,87 @@ func _init() -> void:
 	classic.activate()
 	check(Equipment.armory.is_empty(), "activating a classic campaign opens the armoury again")
 	c.activate()
+
+	# ------------------------------------------------------------ duplicate procurement (P0.C)
+	# The 28 Oct playtest (docs/PLAYTEST_2026-10-28_CAMPAIGN.md §2) reproduced a charge for
+	# an item already in the armoury: the procurement draft is dealt before the inheritance
+	# is chosen, so picking "plate carriers on day one" left a $6,000 plate contract on the
+	# desk. dup_probe.gd is folded in here: seeds 1-12, every inheritance, every contract.
+	var mlegacy := "user://legacy_rogue_test_matrix.json"
+	DirAccess.open("user://").remove(mlegacy.get_file())
+	var matrix_seeds := int(args.get("matrix-seeds", "12"))
+	var combos := 0
+	var wasted: Array = []
+	var redealt := 0
+	var stream_checked := false
+	for msd in range(1, matrix_seeds + 1):
+		var probe = Campaign.new()
+		probe.start(msd, true, mlegacy)
+		for did in _cards_of(probe, "doctrine"):
+			var base = Campaign.new()
+			base.start(msd, true, mlegacy)
+			var pre: Array = _cards_of(base, "procurement")
+			var rng0: int = base.run.rng.state
+			var drng0: int = base.run.draft_rng.state
+			base.run.pick(base, _draft_index(base, "doctrine"), String(did))
+			var post: Array = _cards_of(base, "procurement")
+			var replaced: Array = pre.filter(func(x): return not post.has(x))
+			redealt += replaced.size()
+			if not stream_checked and not replaced.is_empty():
+				check(base.run.rng.state == rng0, "a re-dealt card leaves the desk's rng alone (seed %d, %s)" % [msd, did])
+				check(base.run.draft_rng.state != drng0, "and draws from its own replacement stream")
+				stream_checked = true
+			for pc in post:
+				if base.run.contract_stocked(String(pc)):
+					wasted.append("seed %d %s: the draft still offers stocked %s" % [msd, did, pc])
+			for pc in post:
+				combos += 1
+				var c2 = Campaign.new()
+				c2.start(msd, true, mlegacy)
+				c2.run.pick(c2, _draft_index(c2, "doctrine"), String(did))
+				var stock0: Array = c2.run.armory.duplicate()
+				var money0: int = c2.dept.balance
+				var cost: int = int(c2.run.CONTRACTS[String(pc)]["cost"])
+				c2.run.pick(c2, _draft_index(c2, "procurement"), String(pc))
+				var fresh: Array = c2.run.armory.filter(func(it): return not stock0.has(it))
+				var spent: int = money0 - c2.dept.balance
+				if fresh.is_empty():
+					wasted.append("seed %d %s -> %s charged $%d and added nothing" % [msd, did, pc, spent])
+				elif spent != cost:
+					wasted.append("seed %d %s -> %s charged $%d, the contract is $%d" % [msd, did, pc, spent, cost])
+	check(wasted.is_empty(), "no inheritance x contract pair charges for stocked kit (%d pairs, seeds 1-%d)%s" % [
+		combos, matrix_seeds, "" if wasted.is_empty() else ": " + "; ".join(wasted.slice(0, 3))])
+	check(redealt > 0, "the inheritance re-deals the procurement draft (%d card%s replaced)" % [redealt, "" if redealt == 1 else "s"])
+
+	# the guard (P0.C3): a card the armoury already covers is refused with a line, no
+	# charge and no closed draft. A save written before the fix can still hold one.
+	var g = Campaign.new()
+	g.start(77, true, mlegacy)
+	var gi: int = _draft_index(g, "procurement")
+	check(gi >= 0, "seed 77 deals a procurement draft to guard")
+	if gi >= 0:
+		g.run.stock(["plates"])
+		g.run.drafts[gi]["cards"][0] = "plates"
+		var gm: int = g.dept.balance
+		var gstock: Array = g.run.armory.duplicate()
+		var gl: Array = g.run.pick(g, gi, "plates")
+		check(g.dept.balance == gm and g.run.armory.size() == gstock.size() and _draft_index(g, "procurement") >= 0 and not gl.is_empty(),
+			"a contract for stocked items is refused: no charge, no closed draft (%s)" % str(gl))
+
+	# a free military contract arriving by offer mid-week (P0.C4): Kettering's armoured
+	# rescue vehicle. It stocks the armoury and re-deals the draft in the same step.
+	var o = Campaign.new()
+	o.start(2024, true, mlegacy)
+	var odraft: int = _draft_index(o, "procurement")
+	o.run.apply(o, {"contract": "military"}, {"title": "Kettering's armoured truck"})
+	var granted := ""
+	if not o.run.contracts.is_empty():
+		granted = String(o.run.contracts[0])
+	check(o.run.contracts.size() == 1 and granted != "" and o.run.contract_stocked(granted),
+		"a free military contract arrives by offer and stocks its kit (%s)" % str(o.run.contracts))
+	var still := _cards_of(o, "procurement").filter(func(x): return o.run.contract_stocked(String(x)))
+	check(still.is_empty(), "and no card in the open draft is fully stocked afterwards%s" % ("" if still.is_empty() else ": " + str(still)))
+	check(_draft_index(o, "procurement") == odraft, "with the procurement draft still open for the week")
 
 	# a program teaches the whole force
 	c.run.program = {"id": "GD03", "name": "Respect lines of fire (GD03)", "weeks_left": 1, "started": 1}

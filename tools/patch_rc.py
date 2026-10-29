@@ -34,18 +34,22 @@ from pathlib import Path
 PRODUCT = "The Violence"
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_GD = ROOT / "scripts" / "version.gd"
-FALLBACK_VERSION = "1.2.1.0"
 
 
 def version() -> str:
-    """The Windows four-part version, from scripts/version.gd (the canonical source)."""
+    """The Windows four-part version, from scripts/version.gd (the canonical source).
+
+    There is no fallback constant: a build that cannot read the version must stop,
+    not stamp the exe with a number nobody bumped (the old hardcoded fallback was
+    the one place a version bump could leave behind).
+    """
     try:
         source = VERSION_GD.read_text(encoding="utf-8")
-    except OSError:
-        return FALLBACK_VERSION
+    except OSError as exc:
+        raise SystemExit(f"patch_rc: cannot read {VERSION_GD}: {exc}") from exc
     match = re.search(r'^const\s+VALUE\s*:=\s*"([^"]+)"', source, re.MULTILINE)
     if not match:
-        return FALLBACK_VERSION
+        raise SystemExit(f"patch_rc: {VERSION_GD} has no const VALUE")
     parts = [p for p in match.group(1).split(".") if p != ""]
     while len(parts) < 4:
         parts.append("0")

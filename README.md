@@ -2,7 +2,7 @@
 
 A Godot 4 tactical autobattler set in **Port Carrick**, a rust-belt city on the edge of collapse. As police chief, manage the department, choose situations to answer and plan operations that play out hands-off. Civilian harm and excessive force have political consequences before an election ends the forty-week campaign.
 
-This is a **1.3 candidate**, not a finished release: the runtime and export metadata still say 1.2.1. The authoritative city model is [Port Carrick v0.4](port-carrick/README.md); the game now reads its generated `city.json`. The twelve tactical maps remain stylized, schematic layouts, not surveyed replicas of the city sites.
+This is **1.3.0, Early Access** — a work in progress, labelled as such on the title screen: the run is playable end to end, the balance and the store build are not finished. The version line is 1.3.x for Early Access and 2.0 for the 1.0 release. The authoritative city model is [Port Carrick v0.4](port-carrick/README.md); the game now reads its generated `city.json`. The twelve tactical maps remain stylized, schematic layouts, not surveyed replicas of the city sites.
 
 ## Play
 
@@ -46,7 +46,7 @@ The city generator and validator have separate Python dependencies and commands;
 - The [test-range fixes](docs/TEST_RANGE_DEBUG_2026-10-27.md) resolve the two reproduced friendly-lane and reload/cover stalemates in regression replays. Other layouts and edge cases can still stall; the shield-response prototype and resistance-adjusted bad-habit stress need broader balance and visual review.
 - The [2026-10-27 playtest](docs/PLAYTEST_2026-10-27.md) found a serious trauma-related misjudgment spike in crowds. The suggested-plan mitigation is **not** a fix; the event-probe balance gate remains necessary. The roster availability, economy, lost-allies recovery and run-layer balance also need work and measurement.
 - The board overview and automatic-kit-purchase fix address parts of that playtest, but the existing level designs are proxies. The four planned 1.5 maps (12–15), squad command layer and related tests are not present; see [level constraints](docs/design/LEVEL_DESIGN_CONSTRAINTS.md). Bridge closures are modeled in city data, not as a campaign mechanic.
-- Cutscene coverage, music, crayon re-rendering and graphics performance gates remain incomplete. The Windows executable is unsigned and has not been tested on Windows; licensing/notices and a proper release build are still needed. CI is defined in `.github/workflows/ci.yml` but has not yet run on GitHub.
+- Cutscene coverage, music, crayon re-rendering and graphics performance gates remain incomplete. The Windows executable is unsigned and has not been tested on Windows, and a proper release build is still needed. Licensing is settled (proprietary, all rights reserved — see [`LICENSE`](LICENSE) and [`THIRD_PARTY_NOTICES`](THIRD_PARTY_NOTICES), both included in every export); CI runs in `.github/workflows/ci.yml`.
 - The city's author-edit pass and final review of placeholder street/landmark names remain open. Some older design/playtest documents describe earlier snapshots and may use superseded addresses or art direction; this README and the current code describe the working tree.
 
 ## Repository map

@@ -12,6 +12,7 @@ const SaveFile = preload("res://scripts/campaign/save_file.gd")
 const Version = preload("res://scripts/version.gd")
 
 const VERSION := Version.VALUE
+const CHANNEL := Version.CHANNEL   # "Early Access" while the 1.3 line runs (P0.D1)
 
 var main
 # Kept separate for UI tests; in the game this is the campaign's single save slot.
@@ -316,7 +317,8 @@ func show_credits(from: String) -> void:
 	var v := _page("Credits", 620.0)
 	for ln in [
 		["THE VIOLENCE", 18],
-		["Version %s" % VERSION, 12],
+		["%s  ·  version %s" % [CHANNEL, VERSION], 12],
+		["In development: the balance, the content and the store build are not finished.", 11],
 		["", 8],
 		["Design: Ambidgen", 14],
 		["Built with Claude (Anthropic): code, simulation, art generation and sound.", 13],
@@ -325,6 +327,9 @@ func show_credits(from: String) -> void:
 		["Art: drawn in code, in crayon: scripts/view/crayon*.gd, baked by tools/bake_crayon.gd.", 13],
 		["Type: Patrick Hand by Patrick Wagesreiter (SIL Open Font Licence 1.1).", 13],
 		["Sound: every effect is synthesised by tools/make_sounds.py. No samples.", 13],
+		["Cutscenes: rendered with Remotion 4 from cinematics/; the films are set in Courier Prime, Oswald and Open Sans (SIL Open Font Licence 1.1).", 12],
+		["", 8],
+		["The Violence is (c) 2026 Ambidgen, all rights reserved. Every third-party component and its licence is listed in THIRD_PARTY_NOTICES, which ships with the game.", 12],
 		["", 8],
 		["Port Carrick, its wards, its people and its candidates are invented. Any resemblance to a real city is the point, not the intent.", 12],
 		["", 8],
@@ -596,6 +601,9 @@ class CityArt extends Control:
 		var red := Color(0.70, 0.12, 0.15)
 		C.line(self, Vector2(86, 204), Vector2(86 + 640 * rev(1.5, 0.5), 200), red, 7.0, 502, 2.4, 2)
 		C.line(self, Vector2(96, 216), Vector2(96 + 560 * rev(1.7, 0.5), 218), red, 4.0, 503, 2.0, 1)
+		# the version line, said plainly in the corner of the title plate (P0.D1)
+		C.letters(self, CHANNEL.to_upper(), Vector2(622, 84), 17, red, 505, 2, 1.0, rev(0.4, 0.7))
+		C.letters(self, "V%s" % VERSION, Vector2(700, 104), 13, C.GRAPHITE, 506, 1, 1.0, rev(0.5, 0.7))
 		C.letters(self, "FORTY WEEKS TO THE ELECTION  ·  EVERY RUN A DIFFERENT CITY", Vector2(90, 250), 18, C.BRICK, 504, 2, 1.0, rev(1.9, 0.8))
 		# the hovered scrap, ringed in red with an arrow at it
 		if _hov != null and is_instance_valid(_hov):
