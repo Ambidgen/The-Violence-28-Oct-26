@@ -1800,6 +1800,10 @@ func _think(o) -> void:
 		w.stop(o)
 		o.look_goal = (o.ticker["fixate_p"] - o.pos).angle()
 		return
+	# an attack at a public event: officers on post go to the gunfire (EA_TASKS P1.B)
+	if o.judges and not withdrawing and _to_the_shots(o, tm, el):
+		_finish_look(o)
+		return
 	# P5 react
 	if _react(o, tm):
 		_finish_look(o)
@@ -2707,6 +2711,49 @@ func _latest_lkp(o):
 		if best == null or l["t"] > best["t"]:
 			best = l
 	return best
+
+
+## Active-shooter response (EA_TASKS P1.B). Once an attack at a public event has begun,
+## an officer on post who cannot see the attacker moves toward where the team last saw
+## him, or failing that toward the last gunfire the team heard, at a run; on sight the
+## engagement rules above take over. Before this, posted officers held their posts for
+## the rest of the event while an attacker out of their sight kept shooting: in the n=60
+## sweep, 1 to 5 attackers in 60 were never stopped and hit up to 13 people each.
+const SHOOTER_LKP_S := 30.0
+const SHOOTER_SOUND_S := 10.0
+func _to_the_shots(o, tm: Dictionary, el: Dictionary) -> bool:
+	if not w.attack_on or el["mode"] != "hold":
+		return false
+	var p = null
+	var best_t := -INF
+	var up := false
+	for eid in tm["lkps"]:
+		var e = w.op_by_id(eid)
+		if e == null or not e.attacker or not e.alive() or e.complying:
+			continue
+		up = true
+		var l: Dictionary = tm["lkps"][eid]
+		if w.t - float(l["t"]) < SHOOTER_LKP_S and float(l["t"]) > best_t:
+			best_t = float(l["t"])
+			p = l["p"]
+	if p == null:
+		var snd: Dictionary = tm.get("sound", {})
+		if snd.is_empty() or not w.GUN_SOUNDS.has(String(snd["kind"])) or w.t - float(snd["t"]) > SHOOTER_SOUND_S:
+			return false
+		if not up:
+			for e in w.ops:
+				if e.attacker and e.alive() and not e.complying:
+					up = true
+					break
+		if not up:
+			return false
+		p = snd["p"]
+	if o.pos.distance_to(p) < 3.0:
+		return false
+	o.dbg = "to the shots"
+	w.move_to(o, p, "run")
+	o.look_goal = (p - o.pos).angle()
+	return true
 
 
 func _team_lkp(tm: Dictionary, within: float, from: Vector2):
