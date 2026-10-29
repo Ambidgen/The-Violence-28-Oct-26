@@ -30,6 +30,7 @@ var stills: Array = []
 var frame_count := 0
 var elapsed := 0.0
 var saved_stills: Array = []
+var saved_frames := 0
 var failed := false
 
 
