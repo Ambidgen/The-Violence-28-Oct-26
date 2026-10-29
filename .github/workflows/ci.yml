@@ -136,11 +136,12 @@ jobs:
       github.event_name == 'schedule' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
     runs-on: ubuntu-latest
-    # Measured: one 40-week run is ~21 minutes of wall clock; four at a time on a
-    # 4-vCPU runner is ~40 minutes per two seeds (the 1.A pilot: 8 runs, 2537 s).
-    # Twenty seeds is therefore ~7 h, which is why 300 minutes was not enough and
-    # why the weekly drift check runs fewer seeds than the baseline.
-    timeout-minutes: 720
+    # Measured: one 40-week run is 21-34 minutes of wall clock depending on how loaded
+    # the runner is; four at a time is 37-68 minutes per two seeds (four 1.A pilots:
+    # 8 runs each, 2246-4069 s, identical tables). Twenty seeds is therefore 7-11 h,
+    # which is why 300 minutes was not enough, why the limit is 18 h, and why the
+    # weekly drift check runs fewer seeds than the baseline.
+    timeout-minutes: 1080
     # The evidence has to live in the repository: the artifact is only downloadable
     # from the run page, and this project's record of a cycle is tests/results/.
     permissions:

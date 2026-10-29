@@ -39,13 +39,13 @@ bands — report-only until P1.I.
   two-seed pilot on every push to an `arena/*` branch, uploading `build/balance/` as an
   artifact and **committing `report.md` + `summary.json` to `tests/results/cycle-1A/`**
   (`pilot/` for a pilot, `baseline/` for a dispatch) so the evidence outlives the run.
-- **First measurement** (2 seeds × 4 policies, 8 runs, 2246–2537 s over two pilots, 0 broken
-  both times): the shape is
+- **First measurement** (2 seeds × 4 policies, 8 runs, 2246–4069 s across four pilots, 0
+  broken every time): the shape is
   the playtest's. Fit collapses on every policy (lowest 0–8, floor 10); `accept-all`
   bankrupts itself (−$302k at the low, 20–33 civilians killed); `military-first` has the
   best lethality (0.18 killed per operation on average, 0.21 at its worst) against a band of
-  0.15; no policy wins an ally back; the two pilots' tables matched to the decimal. 36 of 52 band checks miss, and none is enforced — report-only until P1.I.
-  A 40-week run is 21 minutes, so the 20-seed baseline is ~7 h.
+  0.15; no policy wins an ally back; every pilot's table matched the others to the decimal. 36 of 52 band checks miss, and none is enforced — report-only until P1.I.
+  A 40-week run is 21–34 minutes, so the 20-seed baseline is 7–11 h.
 - The 20-seed baseline (P1.A4) is ~7 h of CPU and is one dispatch away; the two-seed
   pilot in `tests/results/cycle-1A/pilot/` is labelled as a pilot, not a baseline.
 

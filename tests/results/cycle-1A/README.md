@@ -24,7 +24,7 @@ exists and is **report-only**.
 | File | Status |
 |---|---|
 | `README.md` (this file) | written |
-| `pilot/report.md`, `pilot/summary.json` | the **last** pilot run — regenerated on every push to this branch, so the wall clock in it is that run's. 2 seeds × 4 policies × 40 weeks, 8 runs, 2246–2537 s, Godot 4.7.2, **0 broken runs**, 36 band misses. Three pilots so far (runs 40807612351, 40812061037, 40815643257) produced **identical tables**; the numbers below are from those |
+| `pilot/report.md`, `pilot/summary.json` | the **last** pilot run — regenerated on every push to this branch, so the wall clock in it is that run's. 2 seeds × 4 policies × 40 weeks, 8 runs, 2246–4069 s, Godot 4.7.2, **0 broken runs**, 36 band misses. Every pilot so far produced an **identical table**; the numbers below are from them |
 | the smoke | **green** — `rogue_balance_test --smoke` is in the quick tier and passed on 4.7.2 and 4.4.1 in the same runs as `policies_test.gd` (run 40800062910 onward) |
 | `baseline/` (20 seeds × 4 policies) | **not run** — P1.A4, one `Run workflow` away (tier=balance); the job commits it here |
 
@@ -59,8 +59,8 @@ measured through the harness at all, and the shape is the playtest's:
 | allies won back | 0 | 0 | 0 | 0 |
 | chief kept | 2/2 | 1/2 | 2/2 | 1/2 |
 
-- **The two pilots produced identical tables** — every metric, to the decimal, on the
-  same seeds. The run layer is deterministic through the harness, which is what makes a
+- **Every pilot produced an identical table** — every metric, to the decimal, on the
+  same seeds, including a run on a runner loaded enough to take twice as long. The run layer is deterministic through the harness, which is what makes a
   later cycle's change measurable at all.
 - **The policies separate**, which is the first thing this had to show: `minimal` never
   spends and ends with $414k; `military-first` has the best lethality (0.18 mean, 0.21 at
@@ -81,10 +81,10 @@ measured through the harness at all, and the shape is the playtest's:
   playtest's own figures turned into thresholds; the pilot says the playtest's shape is
   the whole 40-week run, not an edge case. P1.I decides whether the thresholds move or
   the game does.
-- **Wall clock: 21 minutes per 40-week run** (2246 s and 2537 s for the two pilots' eight
-  runs). Four at a time on a 4-vCPU runner is ~37–42 minutes per two seeds; twenty seeds
-  is ~7 hours, which is why the balance job's timeout is 12 hours and why the weekly
-  schedule runs eight seeds rather than twenty.
+- **Wall clock: 21–34 minutes per 40-week run**, depending on how loaded the runner is
+  (four pilots, eight runs each: 2246, 2352, 2537 and 4069 s). Four at a time is 37–68
+  minutes per two seeds, so twenty seeds is **7–11 hours**: the balance job's limit is 18
+  hours, and the weekly schedule runs eight seeds rather than twenty.
 
 ## How to reproduce
 
