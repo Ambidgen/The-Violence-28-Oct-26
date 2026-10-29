@@ -122,34 +122,54 @@ jobs:
           path: build/test-logs/
           if-no-files-found: ignore
 
-  balance:
-    # The Gate 1 matrix (EA_TASKS P1.A2/P1.A4): every policy plays whole campaigns,
-    # one process per run, and the summary + per-run JSON come back as an artifact.
-    # Not part of the commit gate: it is tens of minutes to hours. It runs
+  balance-plan:
+    # The Gate 1 matrix (EA_TASKS P1.A2/P1.A4) is split into shards of four seeds: a
+    # GitHub-hosted job stops at 6 hours whatever timeout-minutes says, and one
+    # 40-week run is 21-34 minutes (four 1.A pilots), so twenty seeds in one job
+    # (7-11 h) could never finish. Four seeds x four policies at four at a time is
+    # 1.4-2.3 h per shard; the shards run side by side and balance-merge joins them.
+    # It runs
     #   - on demand (Actions -> ci -> Run workflow, tier=balance, seeds=N),
     #   - weekly (schedule), and
-    #   - on a push to an arena/* branch, as a two-seed pilot: enough to prove the
-    #     harness end to end and to see the shape of the run layer on a real engine.
-    name: balance matrix
+    #   - on a push to an arena/* branch, as a two-seed pilot.
+    name: balance plan
     if: >-
       (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'balance') ||
       github.event_name == 'schedule' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
     runs-on: ubuntu-latest
-    # Measured: one 40-week run is 21-34 minutes of wall clock depending on how loaded
-    # the runner is; four at a time is 37-68 minutes per two seeds (four 1.A pilots:
-    # 8 runs each, 2246-4069 s, identical tables). Twenty seeds is therefore 7-11 h,
-    # which is why 300 minutes was not enough, why the limit is 18 h, and why the
-    # weekly drift check runs fewer seeds than the baseline.
-    timeout-minutes: 1080
-    # The evidence has to live in the repository: the artifact is only downloadable
-    # from the run page, and this project's record of a cycle is tests/results/.
-    permissions:
-      contents: write
     env:
       # A push is the two-seed pilot, the weekly schedule is a drift check (8), and
       # anything else -- a dispatch without a seed count -- is the full baseline.
       SEEDS: ${{ github.event.inputs.seeds || (github.event_name == 'push' && '2' || (github.event_name == 'schedule' && '8' || '20')) }}
+      PER_SHARD: "4"
+    outputs:
+      seeds: ${{ steps.plan.outputs.seeds }}
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - id: plan
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          seeds, per = int(os.environ["SEEDS"]), int(os.environ["PER_SHARD"])
+          assert seeds > 0, "seeds must be a positive number"
+          # the harness numbers seeds 1001, 2002, 3003, ...; shard k starts at seed index k*per
+          shards = [{"first": 1001 + i * 1001, "n": min(per, seeds - i)} for i in range(0, seeds, per)]
+          print("seeds=%d" % seeds)
+          print("shards=" + json.dumps(shards))
+          PY
+
+  balance:
+    name: balance shard (first ${{ matrix.shard.first }}, ${{ matrix.shard.n }} seeds)
+    needs: balance-plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.balance-plan.outputs.shards) }}
+    # well inside GitHub's 6-hour job limit; a shard is 1.4-2.3 h on a loaded runner
+    timeout-minutes: 340
     steps:
       - uses: actions/checkout@v4
       - name: cache the engine
@@ -170,30 +190,90 @@ jobs:
           chmod +x ~/godot/godot
       - name: import the project
         run: ~/godot/godot --headless --path . --import || true
-      - name: balance matrix
+      - name: balance shard
         # One process per seed x policy, each with its own XDG_DATA_HOME (the harness
-        # does that itself). Report-only bands until P1.I, so this job's colour is
-        # "the runs finished", not "the game is balanced" — read report.md.
+        # does that itself). Its exit code is only "these runs finished"; the merge
+        # job judges the whole matrix.
         run: |
           ~/godot/godot --headless --path . -s res://tests/rogue_balance_test.gd -- \
-            --seeds="$SEEDS" --policy=all --weeks=40 --jobs=4 --json=build/balance
+            --seeds=${{ matrix.shard.n }} --first=${{ matrix.shard.first }} \
+            --policy=all --weeks=40 --jobs=4 --json=build/balance
+      - name: upload the shard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-shard-${{ matrix.shard.first }}
+          # run-*.json and the shard's summary.json (its broken list) are what the
+          # merge needs; the per-run user:// folders are scratch.
+          path: |
+            build/balance/run-*.json
+            build/balance/summary.json
+            build/balance/report.md
+          if-no-files-found: warn
+
+  balance-merge:
+    name: balance matrix
+    needs: [balance-plan, balance]
+    # also when a shard failed: the merge reports the missing runs as broken
+    if: always() && needs.balance-plan.result == 'success'
+    runs-on: ubuntu-latest
+    # The evidence has to live in the repository: the artifact is only downloadable
+    # from the run page, and this project's record of a cycle is tests/results/.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: cache the engine
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-4.7.2-stable
+      - name: install Godot 4.7.2-stable
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q -o /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v4.7.2-stable_linux.x86_64 ~/godot/godot
+          chmod +x ~/godot/godot
+      - name: import the project
+        run: ~/godot/godot --headless --path . --import || true
+      - name: download the shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: balance-shard-*
+          path: shards
+      - name: merge the shards
+        # The same report.md and summary.json a single process would have written
+        # (checked: two one-seed shards merge to the two-seed report, byte for byte
+        # apart from the wall clock). A seed x policy no shard produced is broken.
+        run: |
+          set -uo pipefail
+          dirs=$(find shards -mindepth 1 -maxdepth 1 -type d | sort | paste -sd, -)
+          echo "shards: ${dirs:-none}"
+          ~/godot/godot --headless --path . -s res://tests/rogue_balance_test.gd -- \
+            --merge="${dirs}" --seeds=${{ needs.balance-plan.outputs.seeds }} --first=1001 \
+            --policy=all --weeks=40 --json=build/balance
       - name: upload the matrix
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: balance-${{ github.run_id }}
-          path: build/balance/
-          # The per-run user:// folders are scratch, not evidence.
-          # (report.md, summary.json and run-*.json are what matter.)
+          path: |
+            build/balance/report.md
+            build/balance/summary.json
           if-no-files-found: warn
       - name: keep the report in the repository
         # The artifact dies with the run; the cycle evidence does not. A dispatched
         # matrix is the baseline (P1.A4), an arena/* push is the pilot -- and the
-        # commit is tagged [skip ci] so that the evidence does not start another
-        # forty-minute matrix.
+        # commit is tagged [skip ci] so that the evidence does not start another matrix.
         if: >-
+          always() && hashFiles('build/balance/report.md') != '' && (
           (github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'balance') ||
-          (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
+          (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/')))
         env:
           DEST: ${{ github.event_name == 'workflow_dispatch' && 'tests/results/cycle-1A/baseline' || 'tests/results/cycle-1A/pilot' }}
         run: |
@@ -209,6 +289,7 @@ jobs:
             exit 0
           fi
           git commit -m "balance: $DEST [skip ci]"
+          git pull --rebase origin "${{ github.ref_name }}"
           git push origin "HEAD:${{ github.ref_name }}"
 
   full:

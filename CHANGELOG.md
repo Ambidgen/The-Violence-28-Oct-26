@@ -2,6 +2,12 @@
 
 Newest first. The README covers the game as it stands; this file keeps the history.
 
+
+## Unreleased — the 1.A baseline can finish; the walk's exit (2026-10-29)
+
+- **The 20-seed balance baseline is sharded** (EA_TASKS P1.A4). A GitHub-hosted job stops at 6 hours, and twenty seeds in one job is 7–11 h, so the dispatched baseline would always have been killed. `balance-plan` → `balance` (one job per four seeds) → `balance-merge`. `rogue_balance_test.gd --merge=DIR1,DIR2 --seeds=N --first=1001` combines shard directories into the same `report.md` and `summary.json` a single process writes, and reports any seed × policy no shard produced, and anything a shard's own summary lists, as broken. Verified: merged two one-seed shards = the two-seed report apart from the wall clock; a missing shard exits 1. `actionlint` clean.
+- **`ui_walk` releases the game's static caches before quitting** (EA_TASKS B4): an intermittent `resources still in use at exit` failed the suite once each on two CI runs and never locally. Unproven fix; the annotations will name a recurrence.
+
 ## Unreleased — EA_TASKS cycle 1.A: the balance harness (2026-10-28)
 
 The measurement every later Phase 1 cycle is judged by. Four policies play whole

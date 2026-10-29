@@ -7,6 +7,7 @@ extends SceneTree
 ##   ... -- --seeds=3 --policy=cautious,military --weeks=40 --json=build/balance --jobs=4
 ##   ... -- --smoke                      # 1 seed x 4 policies x 2 weeks, quick tier
 ##   ... -- --one=1001:cautious --out=...  # internal: one run in this process
+##   ... -- --merge=DIR1,DIR2 --json=OUT --seeds=20 --first=1001   # combine shards (no runs)
 ##
 ## Options
 ##   --seeds=N        how many seeds (default 20; seed numbers are 1001, 2002, 3003, ...)
@@ -20,6 +21,11 @@ extends SceneTree
 ##   --enforce        miss a band and exit 1 (the file says report-only until P1.I)
 ##   --timeout=S      seconds one run may take before it is killed (default 3600; smoke 300)
 ##   --smoke          the quick-tier shakedown: 1 seed, all policies, 2 weeks
+##   --merge=DIRS     combine the run-*.json of shard directories into one report and
+##                    summary.json (written to --json); plays nothing. With --seeds and
+##                    --first, a seed x policy with no JSON is reported as broken, and so
+##                    is anything a shard's own summary.json lists as broken. A GitHub job
+##                    stops at 6 hours, so the 20-seed baseline runs as shards (EA_TASKS P1.A4).
 ##
 ## Exit: 0 all runs finished and every band held (or bands are report-only); 1 a run
 ## hung, never reached the election, wrote no JSON, or (with --enforce) a band missed.
@@ -213,6 +219,8 @@ func _child(args: Dictionary) -> int:
 
 # ================================================================== the matrix
 func _parent(args: Dictionary) -> int:
+	if args.has("merge"):
+		return _merge(args)
 	var smoke := args.has("smoke")
 	var policy_list: Array = Policies.parse(String(args.get("policy", "all")))
 	if policy_list.is_empty():
@@ -308,6 +316,15 @@ func _parent(args: Dictionary) -> int:
 			broken.append("seed %d %s: unreadable JSON" % [int(job2["seed"]), String(job2["policy"])])
 			continue
 		runs.append(parsed)
+	return _finish(runs, broken, policy_list, weeks, n_seeds, Time.get_ticks_msec() - t0, out_dir,
+		bands_path, enforce, done)
+
+
+## Everything after the runs: breakage, bands, the report and summary.json, the exit code.
+## Shared by a matrix that played its runs and by --merge, so a merged report and a
+## single-process report of the same runs are the same document.
+func _finish(runs: Array, broken: Array, policy_list: Array, weeks: int, n_seeds: int, wall: int,
+		out_dir: String, bands_path: String, enforce: bool, done: int) -> int:
 	for r2 in runs:
 		var why: Array = breakage(r2, weeks)
 		for w2 in why:
@@ -327,7 +344,6 @@ func _parent(args: Dictionary) -> int:
 		band_lines = res["lines"]
 		misses = int(res["misses"])
 
-	var wall := Time.get_ticks_msec() - t0
 	var report := _report(by_policy, policy_list, weeks, n_seeds, runs.size(), wall, band_lines, bands, misses, enforce, broken)
 	_write_text("%s/report.md" % out_dir, report)
 	_write_json("%s/summary.json" % out_dir, {
@@ -348,6 +364,71 @@ func _parent(args: Dictionary) -> int:
 	if runs.is_empty() or done == 0:
 		return 1
 	return 0
+
+
+## --merge: the runs of several shard directories as one matrix (EA_TASKS P1.A4).
+func _merge(args: Dictionary) -> int:
+	var dirs: Array = String(args["merge"]).split(",", false)
+	var out_dir := String(args.get("json", "build/balance"))
+	if not out_dir.is_absolute_path():
+		out_dir = ProjectSettings.globalize_path("res://").path_join(out_dir)
+	if not DirAccess.dir_exists_absolute(out_dir):
+		DirAccess.make_dir_recursive_absolute(out_dir)
+	var weeks := int(args.get("weeks", "40"))
+	var runs: Array = []
+	var broken: Array = []
+	var seen := {}
+	var wall := 0
+	for d in dirs:
+		var dir := String(d)
+		if not dir.is_absolute_path():
+			dir = ProjectSettings.globalize_path("res://").path_join(dir)
+		var da := DirAccess.open(dir)
+		if da == null:
+			broken.append("shard %s: no such directory" % dir)
+			continue
+		# what the shard itself knew went wrong (a run that timed out left no JSON)
+		if FileAccess.file_exists(dir.path_join("summary.json")):
+			var sm = JSON.parse_string(FileAccess.get_file_as_string(dir.path_join("summary.json")))
+			if sm is Dictionary:
+				wall = maxi(wall, int(sm.get("wall_ms", 0)))   # shards run side by side
+				for b in sm.get("broken", []):
+					broken.append("shard %s: %s" % [dir.get_file(), String(b)])
+		for f in da.get_files():
+			if not (f.begins_with("run-") and f.ends_with(".json")):
+				continue
+			var parsed = JSON.parse_string(FileAccess.get_file_as_string(dir.path_join(f)))
+			if not (parsed is Dictionary) or not parsed.has("seed") or not parsed.has("policy"):
+				broken.append("shard %s: %s is unreadable" % [dir.get_file(), f])
+				continue
+			var key := "%d:%s" % [int(parsed["seed"]), String(parsed["policy"])]
+			if seen.has(key):
+				broken.append("seed %d %s appears in two shards" % [int(parsed["seed"]), String(parsed["policy"])])
+				continue
+			seen[key] = true
+			runs.append(parsed)
+	var policy_list: Array = []
+	var wanted: Array = Policies.parse(String(args.get("policy", "all")))
+	for pol in wanted:
+		if runs.any(func(r): return String(r["policy"]) == String(pol)) or args.has("seeds"):
+			policy_list.append(String(pol))
+	var seeds := {}
+	for r in runs:
+		seeds[int(r["seed"])] = true
+	var n_seeds := seeds.size()
+	if args.has("seeds"):
+		# the matrix that was asked for: every seed x policy must be there
+		n_seeds = int(args["seeds"])
+		var first := int(args.get("first", "1001"))
+		for i in n_seeds:
+			for pol2 in policy_list:
+				var key2 := "%d:%s" % [first + i * SEED_STEP, String(pol2)]
+				if not seen.has(key2):
+					broken.append("seed %d %s: no run in any shard" % [first + i * SEED_STEP, String(pol2)])
+	runs.sort_custom(func(a, b): return int(a["seed"]) * 10 + policy_list.find(String(a["policy"])) < int(b["seed"]) * 10 + policy_list.find(String(b["policy"])))
+	print("rogue_balance: merging %d run(s) from %d shard(s) -> %s" % [runs.size(), dirs.size(), out_dir])
+	return _finish(runs, broken, policy_list, weeks, n_seeds, wall, out_dir,
+		String(args.get("bands", BANDS_PATH)), args.has("enforce"), runs.size())
 
 
 # ================================================================== derived numbers
