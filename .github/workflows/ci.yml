@@ -250,7 +250,9 @@ jobs:
     name: balance matrix
     needs: [balance-plan, balance]
     # also when a shard failed: the merge reports the missing runs as broken
-    if: always() && needs.balance-plan.result == 'success'
+    # never for a cancelled run: a matrix cancelled mid-flight still uploads the runs it
+    # had finished, and its merge once committed a 27-of-80 report over a later full one
+    if: ${{ !cancelled() && needs.balance-plan.result == 'success' }}
     runs-on: ubuntu-latest
     # The evidence has to live in the repository: the artifact is only downloadable
     # from the run page, and this project's record of a cycle is tests/results/.
@@ -334,8 +336,12 @@ jobs:
             exit 0
           fi
           git commit -m "balance: $DEST [skip ci]"
-          git pull --rebase origin "${{ github.ref_name }}"
-          git push origin "HEAD:${{ github.ref_name }}"
+          # the branch may have moved (another result) or gone (merged and deleted): this
+          # run's files win a conflict, and a deleted branch is created again
+          if git ls-remote --exit-code --heads origin "${{ github.ref_name }}" >/dev/null; then
+            git pull --rebase -X theirs origin "${{ github.ref_name }}"
+          fi
+          git push origin "HEAD:refs/heads/${{ github.ref_name }}"
 
   crowd:
     # The 1.B crowd sweep (EA_TASKS P1.B1): police on post at a public event, quiet and
@@ -387,7 +393,7 @@ jobs:
   crowd-report:
     name: crowd sweep
     needs: crowd
-    if: always() && github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'crowd'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'crowd' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -415,8 +421,12 @@ jobs:
           git add "$DEST"
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "crowd: $DEST [skip ci]"
-          git pull --rebase origin "${{ github.ref_name }}"
-          git push origin "HEAD:${{ github.ref_name }}"
+          # the branch may have moved (another result) or gone (merged and deleted): this
+          # run's files win a conflict, and a deleted branch is created again
+          if git ls-remote --exit-code --heads origin "${{ github.ref_name }}" >/dev/null; then
+            git pull --rebase -X theirs origin "${{ github.ref_name }}"
+          fi
+          git push origin "HEAD:refs/heads/${{ github.ref_name }}"
 
   full:
     # The simulation and campaign suites, on main and on demand only: they run
