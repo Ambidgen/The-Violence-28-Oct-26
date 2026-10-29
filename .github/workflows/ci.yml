@@ -136,13 +136,19 @@ jobs:
       github.event_name == 'schedule' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/arena/'))
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    # Measured: one 40-week run is ~21 minutes of wall clock; four at a time on a
+    # 4-vCPU runner is ~40 minutes per two seeds (the 1.A pilot: 8 runs, 2537 s).
+    # Twenty seeds is therefore ~7 h, which is why 300 minutes was not enough and
+    # why the weekly drift check runs fewer seeds than the baseline.
+    timeout-minutes: 720
     # The evidence has to live in the repository: the artifact is only downloadable
     # from the run page, and this project's record of a cycle is tests/results/.
     permissions:
       contents: write
     env:
-      SEEDS: ${{ github.event.inputs.seeds || (github.event_name == 'push' && '2' || '20') }}
+      # A push is the two-seed pilot, the weekly schedule is a drift check (8), and
+      # anything else -- a dispatch without a seed count -- is the full baseline.
+      SEEDS: ${{ github.event.inputs.seeds || (github.event_name == 'push' && '2' || (github.event_name == 'schedule' && '8' || '20')) }}
     steps:
       - uses: actions/checkout@v4
       - name: cache the engine

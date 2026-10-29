@@ -35,10 +35,18 @@ bands — report-only until P1.I.
   military hardware), the call plan's cap and priority, kit issue, a short account, and
   the bands file's shape.
 - **CI**: `rogue_balance_test --smoke` joins the quick tier, and a new **balance** job
-  runs the matrix — on demand (`tier=balance`, `seeds=N`), weekly, and as a two-seed
-  pilot on every push to an `arena/*` branch, uploading `build/balance/` as an artifact.
-- The 20-seed baseline (P1.A4) needs hours of CPU and is one dispatch away; the two-seed
-  pilot is in `tests/results/cycle-1A/` and is labelled as a pilot, not a baseline.
+  runs the matrix — on demand (`tier=balance`, `seeds=N`), weekly (8 seeds), and as a
+  two-seed pilot on every push to an `arena/*` branch, uploading `build/balance/` as an
+  artifact and **committing `report.md` + `summary.json` to `tests/results/cycle-1A/`**
+  (`pilot/` for a pilot, `baseline/` for a dispatch) so the evidence outlives the run.
+- **First measurement** (2 seeds × 4 policies, 8 runs, 2537 s, 0 broken): the shape is
+  the playtest's. Fit collapses on every policy (lowest 0–8, floor 10); `accept-all`
+  bankrupts itself (−$302k at the low, 20–33 civilians killed); `military-first` has the
+  best lethality at 0.21 killed per operation against a band of 0.15; no policy wins an
+  ally back. 36 of 52 band checks miss, and none is enforced — report-only until P1.I.
+  A 40-week run is 21 minutes, so the 20-seed baseline is ~7 h.
+- The 20-seed baseline (P1.A4) is ~7 h of CPU and is one dispatch away; the two-seed
+  pilot in `tests/results/cycle-1A/pilot/` is labelled as a pilot, not a baseline.
 
 ## Unreleased — EA_TASKS cycle 0.D: version, licence, hygiene (2026-10-28)
 

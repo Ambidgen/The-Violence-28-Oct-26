@@ -102,7 +102,7 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 - **Cost note:** one 40-week run took 10–15 minutes on two cores here, so 80 runs is about 7–10 h on two cores or about 2 h on eight. Use the 3-seed smoke during cycles and the full run overnight or in weekly CI.
 - **Exit:** the baseline reproduces the playtest's shape (fit collapses, deficits, allies lost). If it doesn't, the policies don't match the game yet.
 
-**Status 2026-10-28: built and verified; the 20-seed baseline is the one step left.**
+**Status 2026-10-28: built, run end to end, and the shape matches the playtest; the 20-seed baseline is the one step left.**
 
 | ID | What was built | File |
 |---|---|---|
@@ -112,8 +112,9 @@ Phase 0 builds two of the tools that every later cycle uses: the four-policy bal
 | P1.A4 | **Pilot baseline** from CI (see below): the harness runs a two-seed × four-policy matrix on every push to an `arena/*` branch and uploads it, so the shape can be checked before the long run. The **20-seed baseline** is one `Run workflow` away (Actions → ci → tier=balance); it takes hours and has not been run here. | `tests/results/cycle-1A/` |
 
 - **Also in the tree:** `tests/policies_test.gd` (quick tier, seconds) pins the policy layer: same seed and policy settle the same desk twice, the desk is settled before any operation and never left blocking the week, the policies differ where they are meant to (minimal signs nothing, cautious never signs military hardware, military-first does), the call plan respects each policy's cap and priority, kit is only bought by the policies that buy it, a short account settles the desk without buying anything, and the bands file is well formed and still report-only. `rogue_balance_test --smoke` is in the quick tier too, so the child-process matrix itself is exercised on every commit.
-- **Wall clock:** one 40-week run under a policy was **not** measured here (no engine in the sandbox that built this; see the cycle evidence). The plan's own figure — 10–15 minutes per run on two cores — puts the 20-seed matrix at ~7–10 h on two cores and ~2–3 h on eight, which is why it is a dispatched job and not a commit gate.
-- **Exit:** the baseline reproduces the playtest's shape (fit collapses, deficits, allies lost). **This is still to be read from the first 20-seed matrix**; the two-seed pilot in `tests/results/cycle-1A/` is not a substitute, and is labelled as a pilot.
+- **First measurement, 2 seeds × 4 policies (CI run 40807612351):** 8 runs, 2537 s, Godot 4.7.2, **0 broken runs**, 36 band misses, all report-only. Fit collapses on every policy (lowest 0–8 against a roster floor of 10), `accept-all` bankrupts itself (−$302k at the low, 20–33 civilians killed), `military-first` has the best lethality (0.21 killed per operation, band 0.15), and **no policy wins a single ally back** (`allies_regained` 0 for all eight runs). Full table and reading in `tests/results/cycle-1A/`.
+- **Wall clock: 21 minutes per 40-week run**, measured. Four at a time on a 4-vCPU runner is ~40 minutes per two seeds, so the 20-seed matrix is **~7 h** — the balance job's timeout is now 12 h (300 minutes would have killed it), and the weekly drift check runs 8 seeds rather than 20.
+- **Exit:** the baseline reproduces the playtest's shape (fit collapses, deficits, allies lost). The pilot already shows that shape; what the 20-seed baseline adds is the variance across seeds, which is what P1.I's thresholds have to be set against. `accept-all`'s money numbers are the one outlier worth watching at scale.
 
 ### Cycle 1.B — Crowd cliff *(root cause located)*
 **Diagnosis.**
