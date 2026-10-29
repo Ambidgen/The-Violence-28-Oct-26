@@ -88,15 +88,35 @@ make_placeholders.py, level_port.py, nav_probe.py, patch_rc.py, campaign_report.
 playtest.sh, run_tests.sh) runs on a bare Python 3 standard library.
 
 ================================================================================
-5. EVERYTHING ELSE IS ORIGINAL
+5. TRAILER PROTOTYPES  (development and review; not part of the game export)
+================================================================================
+trailers/ contains five rendered review videos and their editable compositions. In
+addition to Remotion and React (section 3), the render-time tools include Revideo
+0.11.0 (MIT), Motion Canvas 3.17.2 (MIT), HyperFrames 0.8.214 (Apache-2.0),
+GSAP 3.15.0 (GreenSock standard licence: https://gsap.com/standard-license), p5.js
+1.11.10 (LGPL-2.1), Puppeteer (Apache-2.0), Chromium, Vite (MIT), and FFmpeg. The
+bundled FFmpeg used by these Linux render scripts is configured with GPL components.
+The tools and their dependency licences are installed separately with npm; they are
+not embedded in the MP4 output or shipped with the game. Review applicable terms
+before redistributing tools or publishing the trailers.
+
+The screening room and trailer sources include copies of Courier Prime (Copyright 2015
+The Courier Prime Project Authors), Oswald (Copyright 2016 The Oswald Project Authors),
+and Patrick Hand (Copyright 2010–2012 Patrick Wagesreiter), all under SIL OFL 1.1.
+The full copyright and licence texts are in trailers/media/fonts/*-OFL.txt.
+The trailer city illustration is AI-generated concept art; visual-prototype material
+and gameplay captures are identified in trailers/README.md and in the videos.
+
+================================================================================
+6. EVERYTHING ELSE IN THE GAME IS ORIGINAL
 ================================================================================
 The simulation, maps, data, city model (port-carrick/, including the generated
 city.json), crayon art and its bake pipeline, character sprites, sound effects (all
-synthesised by tools/make_sounds.py — no samples), music (none yet), text, icon and
-documentation were made for this project.
+synthesised by tools/make_sounds.py — no samples), music (none yet in the game), text,
+icon and documentation were made for this project.
 
 ================================================================================
-6. CONTACT
+7. CONTACT
 ================================================================================
 Third-party attribution errors are bugs: report them through the repository's hosting
 service and they will be corrected in the next build.
