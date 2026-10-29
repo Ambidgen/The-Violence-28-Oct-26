@@ -442,6 +442,21 @@ func _standing_order() -> void:
 	lines = a.next_week()
 	var refused: Array = lines.filter(func(l): return String(l).contains("no recruit this week"))
 	_check(refused.size() == 1 and a.on_books() == n0 + 3, "when the forecast cannot carry one, nobody is enrolled and the report says why")
+	# the forecast is charged the department's recent overtime: an account that carries a
+	# recruit on allocation and payroll alone does not when operations cost what they have
+	var e = Department.new()
+	e.found(909)
+	e.keep_on_books = e.on_books() + 1
+	# enough for the bare forecast (the recruit's place and four weeks' pay, before any
+	# allocation), not for four weeks of $9,000 overtime on top
+	var need: int = Courses.RECRUIT + Equipment.cost(Equipment.default_kit()) + 4 * Courses.PAY["Officer"]
+	e.balance = need + 500
+	var quiet: String = e.standing_blocked()
+	for wk2 in range(e.week - 4, e.week):
+		e.ledger.append({"week": wk2, "item": "Overtime, operation", "amount": -9000})
+	var busy: String = e.standing_blocked()
+	_check(quiet == "" and busy.contains("overtime") and e.recent_overtime() == 9000,
+		"recent overtime ($%d a week) holds back a recruit the bare forecast would allow: %s" % [e.recent_overtime(), busy])
 	a.balance = 1000000
 	a.keep_on_books = 0
 	var before: int = a.on_books()

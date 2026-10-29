@@ -476,17 +476,33 @@ func on_books() -> int:
 	return officers.filter(func(r): return String(r.get("status", "active")) in ["active", "injured", "training", "academy", "suspended"]).size()
 
 
-## Can the forecast carry one more recruit? Returns "" or why not.
+## Average weekly overtime over the last n weeks of the ledger: what operations cost on
+## top of the forecast, which knows only the allocation, the payroll and filed lawsuits.
+func recent_overtime(n := 4) -> int:
+	var t := 0
+	for e in ledger:
+		if int(e.get("week", 0)) >= week - n and int(e.get("week", 0)) < week \
+				and String(e.get("item", "")).begins_with("Overtime"):
+			t += -int(e.get("amount", 0))
+	return int(round(float(t) / float(n)))
+
+
+## Can the forecast carry one more recruit? Returns "" or why not. The four-week forecast
+## is charged the recruit's academy place and pay and, each week, the department's recent
+## overtime: the 1.C pilot's standing order otherwise enrolled down to $0 and the week's
+## operations then put the account in the red (cautious: 36 of 40 weeks below zero).
 func standing_blocked() -> String:
 	if frozen():
 		return "the account is in the red"
 	var cost: int = Courses.RECRUIT + Equipment.cost(Equipment.default_kit())
 	var pay: int = Courses.PAY["Officer"]
+	var ot: int = recent_overtime()
 	var rows: Array = forecast(4)
 	for i in rows.size():
-		if int(rows[i]["balance"]) - cost - pay * (i + 1) < 0:
-			return "the four-week forecast cannot carry another recruit (week %d would end at $%s)" % [
-				int(rows[i]["week"]), money(int(rows[i]["balance"]) - cost - pay * (i + 1))]
+		var left: int = int(rows[i]["balance"]) - cost - (pay + ot) * (i + 1)
+		if left < 0:
+			return "the four-week forecast cannot carry another recruit (week %d would end at $%s, counting $%s a week of overtime)" % [
+				int(rows[i]["week"]), money(left), money(ot)]
 	return ""
 
 
