@@ -2,6 +2,44 @@
 
 Newest first. The README covers the game as it stands; this file keeps the history.
 
+## Unreleased — EA_TASKS cycle 1.A: the balance harness (2026-10-28)
+
+The measurement every later Phase 1 cycle is judged by. Four policies play whole
+campaigns, one process per run, and the result is a table, a JSON summary and the Gate 1
+bands — report-only until P1.I.
+
+- **`tests/policies.gd`** (P1.A1): the four policies as code — **cautious**, **minimal**,
+  **military-first**, **accept-all**. Each sets the inheritance, the contracts and
+  programs it signs (by tag), how it answers offers and events, whom it hires, which
+  courses it sends officers on, how it decides internal-affairs cases, whether a plan may
+  buy kit, and which calls it takes. Every answer comes from the desk it was dealt, never
+  from a random number, and the desk is settled **before the first operation** in the
+  interface's own order — the two things `op_test` did differently (random desk, answered
+  after the week's operations, suggested kit always issued). Policies run on current kit
+  unless they are the ones that buy it.
+- **`tests/rogue_balance_test.gd`** (P1.A2): `--seeds=20 --policy=all --weeks=40
+  --jobs=4`. One process per seed × policy, each with its own `XDG_DATA_HOME` so no run
+  can see another's save or legacy file; a per-run timeout and kill; `report.md`,
+  `summary.json` and one `run-<seed>-<policy>.json` per run (same shape as
+  `op_test --json`, so `tools/campaign_report.py` reads them too). Exit 1 for a hung
+  operation, a run that never held its election, a missing or unreadable JSON, or — with
+  `--enforce` — a missed band. `--smoke` is the quick-tier shakedown.
+- **`tests/balance_bands.json`** (P1.A3): the Gate 1 thresholds, thirteen of them, each
+  with its aggregation and a written reason, and each compared against every policy over
+  the whole matrix. **`"status": "report-only"`, `"enforce": false`** — a miss is printed,
+  not enforced, until P1.I. The numbers are provisional and are the owner's call
+  (roadmap §8.4); the file starts from the 28 Oct playtest's own figures.
+- **`tests/policies_test.gd`** (quick tier): the policy layer without the simulation —
+  determinism under a fixed seed, desk-before-operations, no blocking draft left, the
+  policies differing where they should (minimal signs nothing, cautious never signs
+  military hardware), the call plan's cap and priority, kit issue, a short account, and
+  the bands file's shape.
+- **CI**: `rogue_balance_test --smoke` joins the quick tier, and a new **balance** job
+  runs the matrix — on demand (`tier=balance`, `seeds=N`), weekly, and as a two-seed
+  pilot on every push to an `arena/*` branch, uploading `build/balance/` as an artifact.
+- The 20-seed baseline (P1.A4) needs hours of CPU and is one dispatch away; the two-seed
+  pilot is in `tests/results/cycle-1A/` and is labelled as a pilot, not a baseline.
+
 ## Unreleased — EA_TASKS cycle 0.D: version, licence, hygiene (2026-10-28)
 
 Gate 0 closed. The three things it was waiting on, decided and implemented.
