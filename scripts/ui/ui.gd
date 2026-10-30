@@ -67,9 +67,18 @@ func build(m) -> void:
 	root.set_anchors_preset(Control.PRESET_RIGHT_WIDE)
 	root.offset_left = -PANEL_W
 	add_child(root)
+	# The setup panel is taller than the screen (1100 px against 900), so the whole panel
+	# scrolls: nothing is ever unreachable, whatever the window or the content.
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	scroll.follow_focus = true
+	root.add_child(scroll)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 6)
-	root.add_child(v)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.add_child(v)
 	var head_row := HBoxContainer.new()
 	v.add_child(head_row)
 	var title := Label.new()
@@ -232,10 +241,11 @@ static func make_theme() -> Theme:
 	th.set_color("font_unselected_color", "TabContainer", INK)
 	th.set_color("font_hovered_color", "TabContainer", Color(0.07, 0.07, 0.07))
 	for sc in ["VScrollBar", "HScrollBar"]:
-		th.set_stylebox("scroll", sc, CB.make(Color(0, 0, 0, 0), Color(0, 0, 0, 0), 0.0, 0.0, 0.0))
-		th.set_stylebox("grabber", sc, CB.make(Color("#a39a86"), Color(0, 0, 0, 0), 3.0, 0.0, 0.3))
-		th.set_stylebox("grabber_highlight", sc, CB.make(Color("#2f2e2d"), Color(0, 0, 0, 0), 3.0, 0.0, 0.3))
-		th.set_stylebox("grabber_pressed", sc, CB.make(Color("#2f2e2d"), Color(0, 0, 0, 0), 3.0, 0.0, 0.3))
+		# a visible track and a grabber you can find and hit: a scrolling panel has to look like one
+		th.set_stylebox("scroll", sc, CB.make(Color("#d3c9b1", 0.55), Color(0, 0, 0, 0), 5.0, 0.0, 0.0))
+		th.set_stylebox("grabber", sc, CB.make(Color("#6e675c"), Color(0, 0, 0, 0), 5.0, 0.0, 0.3))
+		th.set_stylebox("grabber_highlight", sc, CB.make(Color("#2f2e2d"), Color(0, 0, 0, 0), 5.0, 0.0, 0.3))
+		th.set_stylebox("grabber_pressed", sc, CB.make(Color("#2f2e2d"), Color(0, 0, 0, 0), 5.0, 0.0, 0.3))
 	return th
 
 
