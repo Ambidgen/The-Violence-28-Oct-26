@@ -16,6 +16,14 @@ thing being judged is a slight deviation of hand/grade at encode time
 | 2 | `charcoal-night` | darker, contrast pressed up | charcoal laid on harder, night denser |
 | 3 | `warm-paper` | warm colour balance, slight saturation up | aged/cream paper stock |
 
+**Generated:** GitHub Actions run **40975863965** (2026-10-29) — all three jobs green.
+Artifacts: `cutscene-trailer-pencil-light-40975863965`, `cutscene-trailer-charcoal-night-40975863965`,
+`cutscene-trailer-warm-paper-40975863965` (download from the run's Artifacts section).
+Warning: each artifact is ~200 MB — pre-rendered crayon boil is nearly incompressible
+(frame-to-frame hatch noise defeats temporal compression, worst in Theora). Judge on
+the `.mp4`; a production encode pass (denoise-for-encode / lower Theora quality) is
+still owed before anything like this ships in-game.
+
 Each CI artifact (`cutscene-trailer-<variant>-<runid>`, 90 days) contains
 `<variant>.mp4` (review), `<variant>.ogv` (Godot-ready Ogg Theora) — both
 1280×720 per the `trailers/` spec, as full-res crayon noise inflates encodes
