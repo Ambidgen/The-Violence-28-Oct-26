@@ -123,6 +123,12 @@ func play_run(seed_v: int, policy: String, weeks_wanted: int) -> Dictionary:
 				Policies.issues_kit(policy))
 			c.dept.settle_kits()
 			s["plan"] = plan
+			# P1.C5: a policy that does not buy kit itself takes or declines the kit Suggest
+			# a plan proposes, the way the Force tab offers it (bought at Run)
+			if not Policies.issues_kit(policy):
+				plan["kit"] = Autoplan.propose_kit(s, plan, av)
+				plan["kit_mode"] = "suggested" if Policies.takes_suggested_kit(policy) else "own"
+				c.issue_plan_kit(s)
 			if Campaign.plan_members(s).is_empty():
 				s["plan"] = {}
 				continue

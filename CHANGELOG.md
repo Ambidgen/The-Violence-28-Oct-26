@@ -3,6 +3,23 @@
 Newest first. The README covers the game as it stands; this file keeps the history.
 
 
+## Unreleased — EA_TASKS cycle 1.C: the roster bleed (2026-10-29)
+
+- **Where officers die**: the balance harness now logs every operation and week
+  (`ops.csv`, `weeks.csv`); `tools/roster_report.py`. Gang raids are three quarters of
+  officer deaths, and one in two of all deaths is a gang raid at the Warehouse.
+- **The board shows next week's fit officers** against what this week's calls want, red below 12.
+- **Emergency lateral**: an experienced officer on duty this week, at twice a lateral's
+  signing cost, one a week. Hire buttons say what they add to the weekly payroll.
+- **Standing order "keep N on the books"** on the Roster: the academy takes recruits
+  towards N while the forecast, counting recent overtime, stays in the black.
+- **Suggest a plan proposes the Entry kit on a gang raid**, priced on the Force tab and
+  bought when the operation starts; "keep their current kit" declines it. In tested
+  raids it costs about four officers in ten fewer lives than patrol kit.
+- **CI**: a cancelled balance run never commits; result commits survive a moved or
+  deleted branch; each shard reports what it left as annotations.
+- **Trailer prototypes** (Arena) merged in: `trailers/`, excluded from the game.
+
 ## Unreleased — EA_TASKS cycle 1.B: the crowd cliff (2026-10-29)
 
 At a public event, a department with traumatised officers used to shoot its way through

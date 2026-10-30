@@ -43,7 +43,7 @@ const CALL_PRIORITY := {"hostage": 0, "event": 1, "gang": 2, "barricade": 3, "wa
 const POLICIES := {
 	"cautious": {
 		"label": "cautious",
-		"desc": "Hire to 14 (an emergency lateral below 12 fit, a standing order for 18 on the books), train, restraint contracts, no military hardware, answer the gravest two calls and keep high-trauma officers off crowd duty.",
+		"desc": "Hire to 14 (an emergency lateral below 12 fit, a standing order for 18 on the books), train, restraint contracts, no military hardware, take the suggested raid kit, answer the gravest two calls and keep high-trauma officers off crowd duty.",
 		"doctrine": ["liaison", "pie", "cams", "reserve", "union", "lines", "tactical", "plates"],
 		"contracts": ["restraint", "neutral"],
 		"max_contract": 5000,
@@ -55,6 +55,7 @@ const POLICIES := {
 		"courses": {"on": true, "min_balance": 5000, "list": ["coaching", "judgment"]},
 		"ia": "discipline",
 		"issue_kit": false,
+		"suggested_kit": true,
 		"calls": {"max": 2, "types": [], "skip_warrant_below_fit": 12, "skip_event_above_trauma": 12.0},
 	},
 	"minimal": {
@@ -475,6 +476,11 @@ static func _has_calm_officer(c, s: Dictionary, floor: float) -> bool:
 
 ## Whether a policy lets Suggest a plan buy kit for an operation (P1.A1: current kit
 ## unless the policy buys kit).
+## EA_TASKS P1.C5: does the policy accept the kit Suggest a plan proposes for a raid?
+static func takes_suggested_kit(policy: String) -> bool:
+	return bool(POLICIES.get(policy, {}).get("suggested_kit", false))
+
+
 static func issues_kit(policy: String) -> bool:
 	return bool(POLICIES.get(policy, {}).get("issue_kit", false))
 

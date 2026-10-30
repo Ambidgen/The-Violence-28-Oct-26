@@ -1967,7 +1967,16 @@ func _tab(i: int) -> void:
 func _briefing(s: Dictionary) -> void:
 	var spec: Dictionary = Situations.TYPES[s["type"]]
 	_text(box, spec["blurb"], INK, 12)
-	_text(box, "Suggested plans use the officers' current equipment. Issue or change kit on the Force tab.", GREY, 11)
+	_text(
+		box,
+		(
+			"On a gang raid the suggested plan proposes the Entry kit for the officers going in (see the Force tab); otherwise suggested plans use the officers' current equipment. Issue or change kit on the Force tab."
+			if s["type"] in Autoplan.KIT_PROPOSAL_TYPES
+			else "Suggested plans use the officers' current equipment. Issue or change kit on the Force tab."
+		),
+		GREY,
+		11
+	)
 	if s.has("site_name"):
 		_text(box, "%s  ·  %s. The tactical layout is a schematic proxy, not a surveyed floor plan." % [s["site_name"], s.get("site_archetype", "site")], GREY, 11)
 	elif s.get("city_error", false):
@@ -2098,6 +2107,54 @@ func _briefing(s: Dictionary) -> void:
 	cb.tooltip_text = "Body cameras record what each officer sees as evidence for the incident record. You always see what your officers see."
 
 
+## EA_TASKS P1.C5: the Entry kit Suggest a plan proposed for a gang raid, its price, and
+## the chief's choice. It is bought when the operation starts, not before.
+func _kit_proposal_card(s: Dictionary, plan: Dictionary) -> void:
+	var prop: Dictionary = plan.get("kit", {})
+	if prop.is_empty():
+		return
+	var c = main.campaign
+	var members: Array = c.plan_members(s)
+	var n := 0
+	for oid in prop:
+		if members.has(oid):
+			n += 1
+	if n == 0:
+		return
+	var own: bool = String(plan.get("kit_mode", "suggested")) == "own"
+	var cost: int = c.plan_kit_cost(s)
+	var v := _card(box)
+	_text(
+		v,
+		(
+			"SUGGESTED KIT  ·  Entry kit for %d officer%s going in (plates, handgun-rated helmet, flashbangs, the ram on the point man): $%s, bought when the operation starts."
+			% [n, "" if n == 1 else "s", Department.money(maxi(0, cost))]
+		),
+		INK if not own else GREY,
+		11
+	)
+	_text(
+		v,
+		"In tested gang raids it lost about four officers in ten fewer than patrol kit; no single piece of it does that alone.",
+		GREY,
+		10
+	)
+	var h := _h(v)
+	if own:
+		_text(h, "They keep their current kit.", GREY, 11)
+		_btn(h, "Use the suggested kit", func(): _set_kit_mode("suggested"))
+	else:
+		_btn(h, "Keep their current kit", func(): _set_kit_mode("own"))
+	if c.dept.frozen() and not own:
+		_text(v, "The account is in the red: the kit cannot be bought, and they will go in what they have.", Ink.accent(0.9), 10)
+
+
+func _set_kit_mode(m: String) -> void:
+	main.plan["kit_mode"] = m
+	main.plan_changed()
+	show_plan()
+
+
 func _force(s: Dictionary) -> void:
 	var plan: Dictionary = main.plan
 	var squads: Array = plan.get("squads", [])
@@ -2107,6 +2164,7 @@ func _force(s: Dictionary) -> void:
 		GREY,
 		11
 	)
+	_kit_proposal_card(s, plan)
 	var stages: Array = Operation.stages(main.level)
 	for si in squads.size():
 		var sq: Dictionary = squads[si]

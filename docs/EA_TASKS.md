@@ -184,6 +184,18 @@ What was built, against the plan:
 
 - **Exit (cautious policy):** ≥ 12 fit in ≥ 90% of week-end snapshots; ≤ 25 unattended over the run.
 
+**Status 2026-10-29: built; the exit is measured by the next matrix.** Branch `cycle-1C-roster` (PR #5 merged, #8 open).
+
+| ID | Built | Where |
+|---|---|---|
+| P1.C1 | The harness logs every operation (`ops.csv`) and every run-week (`weeks.csv`), committed with the report; `tools/roster_report.py` reads them. **Finding (the 1.C pilot, 2 seeds × 4 policies, 538 operations):** gang raids are **76% of officer deaths** (0.90 killed per raid, 1.45 down); gang · Warehouse & Offices alone is 57% (1.00 per raid), gang · Apartment Block 19%; events, after 1.B, 2%. Of 130 gang-raid deaths 110 were killed by a suspect, 18 bled out. | `tests/rogue_balance_test.gd`, `tools/roster_report.py` |
+| P1.C2 | Next-week strip on the board (fit next week, why, against what this week's calls want; red below 12). The forecast is tested against 12 weeks of a mixed roster: 12/12. | `department.gd fit_next_week()`, `campaign.gd roster_outlook()`, `ops_ui.gd` |
+| P1.C3 | Emergency lateral: on duty this week, $13,000 + kit, one a week, frozen with hiring, rolled from its own stream. Hire buttons show "payroll +$X a week". | `department.gd`, `ops_ui.gd` |
+| P1.C4 | Standing order "keep N on the books" (Roster): up to two academy recruits a turn while the four-week forecast — **charged the department's recent overtime** — stays in the black. Without the overtime the pilot's cautious policy spent 36 of 40 weeks in the red. | `department.gd`, `ops_ui.gd` |
+| P1.C5 | **Measured with `tests/raid_probe.gd`** (the same dealt raids replayed; 60 gang raids, trauma 15, six officers): force size changes success (Warehouse 15% at 6 → 81% at 10), not deaths; trauma 20 roughly doubles them; taking cover after a hit changes nothing (the follow-up hit comes in the same burst); helmets alone (34 killed → 34), plates alone (33), helmet + plates (32) and flashbangs alone (39) change nothing; **the full Entry kit cuts deaths to 20 (−41%)**. Owner's decision: **Suggest a plan proposes the Entry kit on gang raids** — shown with its price on the Force tab, bought at Run (only for officers going in, not for a kit changed by hand since, not while the account is in the red), with "keep their current kit" one click away. The cautious policy takes it, minimal does not. `tests/kit_proposal_test.gd` (quick tier). | `autoplan.gd propose_kit()`, `campaign.gd issue_plan_kit()`, `main.gd`, `ops_ui.gd` |
+
+- **Next:** the 1.B matrix (re-running) for the before; a 1.C matrix on this code for the exit. Why the Entry kit works when none of its parts does alone is not yet known (the ram changes how the door is taken; worth a probe before Phase 3 tuning).
+
 ### Cycle 1.D — Money curve
 **Diagnosis from the logs.**
 - The week-1 margin is $30,500 allocation − $26,264 payroll = **$4,236 a week**. Each officer costs $1,150–1,400 a week, so three hires use up the whole margin.

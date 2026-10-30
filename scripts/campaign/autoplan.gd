@@ -223,6 +223,39 @@ static func suggest(sit: Dictionary, available: Array, lv, bodycams := false, ca
 	return {"squads": squads, "night": false, "bodycams": bodycams}
 
 
+## EA_TASKS P1.C5: the kit Suggest a plan proposes, without issuing it. On a gang raid the
+## officers going through the door are proposed the Entry kit (plates, handgun-rated
+## helmet, flashbangs, the ram on the point man): in 60 probed gang raids it lost 20
+## officers against 34 in patrol kit, where no single piece of it (helmet, plates or
+## flashbangs alone) made a difference. Returns {officer id: {"from": kit now, "to": kit}}
+## for those whose kit would change; the plan carries it, the Force tab shows its cost,
+## and the operation issues it at Run unless the chief keeps their own (Campaign).
+const KIT_PROPOSAL_TYPES := ["gang"]
+
+
+static func propose_kit(sit: Dictionary, plan: Dictionary, available: Array) -> Dictionary:
+	var out := {}
+	if not KIT_PROPOSAL_TYPES.has(String(sit.get("type", ""))):
+		return out
+	var by_id := {}
+	for r in available:
+		by_id[r["id"]] = r
+	for sq in plan.get("squads", []):
+		var kinds: Array = sq.get("orders", {}).get("objs", []).map(func(o): return o.get("kind", ""))
+		if not (kinds.has("clear") or kinds.has("arrest") or kinds.has("rescue")):
+			continue
+		var spec: Dictionary = Equipment.SQUAD_KITS["entry"]
+		var mem: Array = sq.get("members", [])
+		for k in mem.size():
+			var r: Dictionary = by_id.get(mem[k], {})
+			if r.is_empty():
+				continue
+			var to: Dictionary = Equipment.validate(spec["point"] if k == 0 else spec["rest"], Equipment.who_of_record(r))
+			if JSON.stringify(to) != JSON.stringify(r["kit"]):
+				out[String(r["id"])] = {"from": (r["kit"] as Dictionary).duplicate(true), "to": to}
+	return out
+
+
 static func _points(sq: Dictionary, available: Array) -> int:
 	var recs: Array = []
 	for r in available:
