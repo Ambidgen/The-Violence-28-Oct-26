@@ -1,6 +1,6 @@
 # Run-layer balance — 2 seed(s) × 4 policy(ies), 40 weeks
 
-8 run(s), 2460 s wall clock, 4.7.2-stable (official).
+8 run(s), 2512 s wall clock, 4.7.2-stable (official).
 
 | metric | cautious | minimal | military-first | accept-all |
 |---|---|---|---|---|
