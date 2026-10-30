@@ -820,6 +820,7 @@ func ops_select(sid: String) -> void:
 		else:
 			var av: Array = campaign.available_for(sid)
 			cur_sit["plan"] = Autoplan.suggest(cur_sit, av, level, dept.bodycams, Autoplan.share(campaign.board, sid, av.size()), false)
+			cur_sit["plan"]["kit"] = Autoplan.propose_kit(cur_sit, cur_sit["plan"], av)   # P1.C5: proposed, not issued
 			cur_sit["suggested"] = cur_sit["plan"].duplicate(true)   # Q4: what the debrief diffs the run against
 			# Opening a briefing must not buy equipment without the chief's consent.
 			if campaign.plan_members(cur_sit).is_empty():
@@ -846,6 +847,7 @@ func ops_suggest() -> void:
 		return
 	var av: Array = campaign.available_for(cur_sit["id"])
 	plan = Autoplan.suggest(cur_sit, av, level, dept.bodycams, Autoplan.share(campaign.board, cur_sit["id"], av.size()), false)
+	plan["kit"] = Autoplan.propose_kit(cur_sit, plan, av)   # P1.C5: proposed, not issued
 	cur_sit["plan"] = plan
 	cur_sit["suggested"] = plan.duplicate(true)
 	plan_marks.setup(level, nav, cur_sit, plan)
@@ -875,6 +877,9 @@ func ops_run() -> void:
 	if campaign.plan_members(cur_sit).is_empty():
 		return
 	plan["bodycams"] = dept.bodycams
+	# P1.C5: the kit Suggest a plan proposed is bought now, unless the chief kept their own
+	for ln in campaign.issue_plan_kit(cur_sit):
+		dept.note(String(ln))
 	_ia_before_run.clear()
 	for c in dept.cases:
 		_ia_before_run[c.get("id", "")] = true

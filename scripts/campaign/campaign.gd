@@ -8,6 +8,7 @@ extends RefCounted
 ## One ironman save slot: the campaign is saved after every operation and every week.
 
 const Department = preload("res://scripts/campaign/department.gd")
+const Courses = preload("res://scripts/data/courses.gd")
 const Situations = preload("res://scripts/campaign/situations.gd")
 const Politics = preload("res://scripts/campaign/politics.gd")
 const Rogue = preload("res://scripts/campaign/rogue.gd")
@@ -125,6 +126,51 @@ func get_sit(sid: String) -> Dictionary:
 
 ## Officer ids already committed this week: planned into a situation, run in one, or
 ## out canvassing.
+## EA_TASKS P1.C5: the kit Suggest a plan proposed (plan["kit"], see Autoplan.propose_kit),
+## priced: what issuing it would cost now (new kit at cost, kit handed back at half).
+func plan_kit_cost(s: Dictionary) -> int:
+	var plan: Dictionary = s.get("plan", {})
+	var t := 0
+	var members: Array = plan_members(s)
+	for oid in plan.get("kit", {}):
+		var r: Dictionary = dept.get_officer(String(oid))
+		var p: Dictionary = plan["kit"][oid]
+		if r.is_empty() or not members.has(oid) or JSON.stringify(r["kit"]) != JSON.stringify(p["from"]):
+			continue
+		var d: int = Equipment.cost(p["to"]) - int(r.get("issued", Equipment.cost(r["kit"])))
+		t += d if d > 0 else -int(round(-d * Courses.SURPLUS))
+	return t
+
+
+## Issue the proposed kit as the operation starts, unless the chief kept their own
+## (plan["kit_mode"] == "own"): only to officers who are going, whose kit has not been
+## changed by hand since it was proposed, and through the department's reissue (it is
+## bought, and refused while the account is in the red). Returns lines for the log.
+func issue_plan_kit(s: Dictionary) -> Array:
+	var plan: Dictionary = s.get("plan", {})
+	var lines: Array = []
+	if String(plan.get("kit_mode", "suggested")) == "own" or plan.get("kit", {}).is_empty():
+		return lines
+	var members: Array = plan_members(s)
+	var n := 0
+	var spent := 0
+	for oid in plan["kit"]:
+		var r: Dictionary = dept.get_officer(String(oid))
+		var p: Dictionary = plan["kit"][oid]
+		if r.is_empty() or not members.has(oid) or JSON.stringify(r["kit"]) != JSON.stringify(p["from"]):
+			continue
+		var got = dept.reissue(r, p["to"])
+		if got is String:
+			lines.append("The suggested kit was not issued: %s." % got)
+			break
+		n += 1
+		spent += int(got)
+	if n > 0:
+		lines.append("Entry kit issued to %d officer%s ($%s)." % [n, "" if n == 1 else "s", Department.money(spent)])
+	plan["kit"] = {}
+	return lines
+
+
 ## The board's next-week strip (EA_TASKS P1.C2): who will be fit when next week starts,
 ## and what this week's open calls want between them (Suggest a plan's force for each).
 ## Below ROSTER_FLOOR the strip is red: the 28 Oct playtest and the 1.A baseline both
