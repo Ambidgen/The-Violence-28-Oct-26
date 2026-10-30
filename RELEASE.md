@@ -1,3 +1,28 @@
+# The Violence v1.3.0 — Windows build update (2026-10-30)
+
+Rebuilt from the current tree (includes the test range scrolling fix) with the
+**official Godot 4.7.2 Windows export template** and the 4.7.2 editor, not the
+from-source build described below (release assets are reachable again, so the
+90-minute engine compile is no longer needed):
+
+```sh
+# one time: install the 4.7.2 templates from godot-builds into ~/.local/share/godot/export_templates/4.7.2.stable/
+godot --headless --path . --export-release "Windows Desktop" release/TheViolence.exe
+```
+
+```
+release/TheViolence.exe   158.3 MiB (166,001,600 bytes)
+SHA-256  7f4f6def67193e59dd968f159a370acbd68017839284da7fe64fef82bbe9d8f4
+```
+
+Checked: valid x86-64 GUI PE with a 54 MiB `pck` section; the embedded pack boots
+under the 4.7.2 runtime for 300 frames with no script errors. `tools/inspect_pck.py` only
+reads pack format 2 (Godot 4.4), so `--verify` does not work on this build yet. Not run on
+Windows hardware, and unsigned. The stock template carries no game icon or version block
+(rcedit is Windows-only); the 4.4.1 build below compiled them in.
+
+---
+
 # The Violence v1.2.1 — Windows release
 
 ```

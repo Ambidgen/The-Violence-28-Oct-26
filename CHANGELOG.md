@@ -3,6 +3,14 @@
 Newest first. The README covers the game as it stands; this file keeps the history.
 
 
+## Unreleased — UI fix: the test range panel scrolls (2026-10-30)
+
+The test range's setup panel is 1,100 px tall against a 900 px layout, so the last third
+(seed, civilians, police rules, doors, Team A department, body cameras and the RUN button) sat
+off the bottom of the screen with no way to reach it. The whole right-hand panel now lives in a
+scroll container, so it scrolls at any window size. The scrollbars across the game (theme-wide)
+also get a visible track and a thicker grabber; before they were nearly invisible.
+
 ## Unreleased — EA_TASKS cycle 1.B: the crowd cliff (2026-10-29)
 
 At a public event, a department with traumatised officers used to shoot its way through
