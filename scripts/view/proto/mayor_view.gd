@@ -149,6 +149,12 @@ func mp_end() -> void:
 
 
 # ================================================================== people
+func fk_look(who: String) -> Dictionary:
+	if who == "TG":
+		return {"suit": NAVY, "skin": SKIN, "tie": NAVY.darkened(0.4)}
+	return super.fk_look(who)
+
+
 ## Mayor Bob Stevens: the most forgettable man in the city.
 func mp_bob(foot: Vector2, h: float, rr: float, mouth := "frown", hand_r := Vector2.ZERO) -> Dictionary:
 	var rp := {"id": "BOB", "foot": foot, "h": h, "s": 51000, "suit": FADED, "skin": BOB_SKIN, "hair": "bald",
