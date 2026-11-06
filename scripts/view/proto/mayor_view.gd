@@ -418,7 +418,7 @@ func mp4() -> void:
 		edge(bp, ca(INK, rv(wt(29, "GIRL"), 0.5)), 1.8, 57060, rv(wt(29, "GIRL"), 0.5))
 		if rv(wt(29, "GIRL"), 0.5) >= 1.0:
 			solid(C.rect_poly(Rect2(1230, 150, 96, 14)), SKY)
-			txt_c("BEDDROW", 1278.0, 260.0, 14, NAVY, 57061, 2)
+			txt_c("NOUSSAN", 1278.0, 260.0, 14, NAVY, 57061, 2)
 			fk_folk(Vector2(1278, 240), 70.0, SKY, SKINS[1], 57062, 1.0, "smile")
 	# Bob behind his desk
 	var shake := 0.0
